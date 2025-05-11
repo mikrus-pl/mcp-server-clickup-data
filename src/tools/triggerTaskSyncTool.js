@@ -1,4 +1,4 @@
-require('dotenv').config(); // Dla CDC_APP_SCRIPT_PATH
+require('dotenv').config();
 const { exec } = require('child_process');
 const path = require('path');
 
@@ -6,12 +6,11 @@ const CDC_APP_SCRIPT_PATH = process.env.CDC_APP_SCRIPT_PATH;
 
 if (!CDC_APP_SCRIPT_PATH) {
   console.error('[MCP Tool: triggerTaskSync] ERROR: CDC_APP_SCRIPT_PATH is not set in .env for the MCP Server.');
-  // Można by rzucić błąd tutaj, aby serwer się nie uruchomił, jeśli ta ścieżka jest krytyczna od startu
 }
 
 module.exports = {
   name: 'triggerTaskSync',
-  description: 'Triggers the "sync-tasks" command in the ClickUp Data Collector application for a specific list ID. Allows for full sync and including archived tasks.',
+  description: 'Triggers the "sync-tasks" command in CDC for a specific list ID. Allows for full sync and including archived tasks.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -34,25 +33,18 @@ module.exports = {
   },
   handler: async (args) => {
     const safeArgs = args || {};
-    const { listId, fullSync = false, archived = false } = safeArgs;
+    const { listId, fullSync = false, archived = false } = safeArgs; // Użyj wartości domyślnych ze schematu
     console.error(`[MCP Tool: triggerTaskSync] Received request with args: ${JSON.stringify(safeArgs)}`);
 
     if (!CDC_APP_SCRIPT_PATH) {
-      return {
-        isError: true,
-        content: [{ type: 'text', text: 'Server configuration error: CDC_APP_SCRIPT_PATH is not set.' }],
-      };
+      return { isError: true, content: [{ type: 'text', text: 'Server configuration error: CDC_APP_SCRIPT_PATH is not set.' }] };
     }
-
     if (!listId) {
-      return {
-        isError: true,
-        content: [{ type: 'text', text: 'Error: listId argument is required for triggerTaskSync.' }],
-      };
+      return { isError: true, content: [{ type: 'text', text: 'Error: listId argument is required for triggerTaskSync.' }] };
     }
 
     const commandName = "sync-tasks";
-    let cliCommand = `node "${path.basename(CDC_APP_SCRIPT_PATH)}" ${commandName} --listId "${listId}"`; // Dodaj cudzysłowy wokół listId
+    let cliCommand = `node "${path.basename(CDC_APP_SCRIPT_PATH)}" ${commandName} --listId "${listId}"`;
 
     if (fullSync) {
       cliCommand += ` --full-sync`;
@@ -62,29 +54,28 @@ module.exports = {
     }
 
     const cdcAppDir = path.dirname(CDC_APP_SCRIPT_PATH);
-    const executionOptions = { timeout: 600000, cwd: cdcAppDir, env: { ...process.env } }; // Timeout 10 minut dla task sync
+    const executionOptions = { timeout: 600000, cwd: cdcAppDir, env: { ...process.env } }; // 10 minut timeout
 
-    console.error(`[MCP Tool: triggerTaskSync] Preparing to execute CDC command: ${cliCommand} in CWD: ${cdcAppDir}`);
+    console.error(`[MCP Tool: triggerTaskSync] Executing CDC command: ${cliCommand} in CWD: ${cdcAppDir}`);
 
     return new Promise((resolve) => {
       exec(cliCommand, executionOptions, (error, stdout, stderr) => {
+        if (stdout && stdout.trim().length > 0) console.error(`[CDC Output - ${commandName} - STDOUT for list ${listId}]:\n${stdout.trim()}`);
+        if (stderr && stderr.trim().length > 0) console.error(`[CDC Output - ${commandName} - STDERR for list ${listId}]:\n${stderr.trim()}`);
+
         if (error) {
-          const errorMessage = stderr || error.message;
-          console.error(`[MCP Tool: triggerTaskSync] CDC command execution error: code ${error.code}, signal ${error.signal}`);
-          console.error(`[MCP Tool: triggerTaskSync] CDC stderr: ${stderr}`);
-          console.error(`[MCP Tool: triggerTaskSync] CDC stdout (if any on error): ${stdout}`);
+          const errorMessage = (stderr && stderr.trim().length > 0) ? stderr.trim() : error.message;
+          console.error(`[MCP Tool: triggerTaskSync] CDC command "${commandName}" for list ${listId} FAILED: Exit code ${error.code}, Signal ${error.signal}.`);
           resolve({
             isError: true,
-            content: [{ type: 'text', text: `Error executing CDC command "${commandName}": ${errorMessage.trim()}` }],
+            content: [{ type: 'text', text: `Error executing CDC command "${commandName}" for list ${listId}: ${errorMessage}` }],
           });
           return;
         }
-        console.log(`[MCP Tool: triggerTaskSync] CDC command "${commandName}" stdout:\n${stdout}`);
-        if (stderr) {
-          console.warn(`[MCP Tool: triggerTaskSync] CDC command "${commandName}" stderr (may contain warnings):\n${stderr}`);
-        }
+        
+        console.error(`[MCP Tool: triggerTaskSync] CDC command "${commandName}" for list ${listId} executed successfully.`);
         resolve({
-          content: [{ type: 'text', text: `CDC command "${commandName}" executed for list ${listId}.\nStdout:\n${stdout}${stderr ? '\nStderr:\n' + stderr : ''}` }],
+          content: [{ type: 'text', text: `CDC command "${commandName}" for list ${listId} completed successfully. Check server logs for details.` }],
         });
       });
     });

@@ -7,14 +7,14 @@ if (!CDC_APP_SCRIPT_PATH) console.error('[MCP Tool: purgeDatabase] ERROR: CDC_AP
 
 module.exports = {
   name: 'purgeDatabase',
-  description: 'Triggers the "purge-data --confirm" command in the ClickUp Data Collector application. This will delete all data!',
+  description: 'Triggers the "purge-data --confirm" command in the ClickUp Data Collector application. This will delete all data from the CDC database!',
   inputSchema: {
     type: 'object',
     properties: {
-        confirm: { // Dodajemy argument, aby LLM musiał jawnie potwierdzić
+        confirm: {
             type: 'boolean',
-            description: 'Must be set to true to confirm data purge.',
-            enum: [true] // Wymuszamy, aby było true
+            description: 'Must be set to true to confirm data purge. This is a destructive operation.',
+            enum: [true] // Wymusza, aby klient MCP wysłał `true`
         }
     },
     required: ['confirm']
@@ -24,35 +24,44 @@ module.exports = {
     const { confirm } = safeArgs;
     console.error(`[MCP Tool: purgeDatabase] Received request with args: ${JSON.stringify(safeArgs)}`);
 
-    if (!CDC_APP_SCRIPT_PATH) { /* ... obsługa błędu ... */ }
+    if (!CDC_APP_SCRIPT_PATH) { /* ... obsługa błędu braku ścieżki ... */ }
     
     if (confirm !== true) {
+        // To narzędzie wymaga jawnego potwierdzenia przez LLM/klienta.
         return {
-            isError: false, // To nie błąd wykonania, tylko brak potwierdzenia
-            content: [{ type: 'text', text: 'Data purge operation for CDC requires explicit confirmation by setting "confirm" argument to true.' }],
+            isError: false, // Nie jest to błąd wykonania, tylko informacja/wymóg
+            content: [{ type: 'text', text: 'Data purge operation for CDC requires explicit confirmation by setting the "confirm" argument to true.' }],
         };
     }
 
     const commandName = "purge-data";
-    const cliCommand = `node "${path.basename(CDC_APP_SCRIPT_PATH)}" ${commandName} --confirm`; // --confirm jest dodawane na stałe
+    // Flaga --confirm jest dodawana na stałe, ponieważ schemat wejściowy narzędzia MCP już ją wymusza
+    const cliCommand = `node "${path.basename(CDC_APP_SCRIPT_PATH)}" ${commandName} --confirm`; 
 
     const cdcAppDir = path.dirname(CDC_APP_SCRIPT_PATH);
     const executionOptions = { timeout: 120000, cwd: cdcAppDir, env: { ...process.env } }; // 2 minuty timeout
 
-    console.error(`[MCP Tool: purgeDatabase] Preparing to execute CDC command: ${cliCommand} in CWD: ${cdcAppDir}`);
+    console.error(`[MCP Tool: purgeDatabase] Executing CDC command: ${cliCommand} in CWD: ${cdcAppDir}`);
 
     return new Promise((resolve) => {
       exec(cliCommand, executionOptions, (error, stdout, stderr) => {
-        // ... (logika obsługi error, stdout, stderr i resolve - taka sama jak wyżej, dostosowując logi i komunikaty) ...
+        if (stdout && stdout.trim().length > 0) console.error(`[CDC Output - ${commandName} - STDOUT]:\n${stdout.trim()}`);
+        if (stderr && stderr.trim().length > 0) console.error(`[CDC Output - ${commandName} - STDERR]:\n${stderr.trim()}`);
+        
         if (error) {
-          const errorMessage = stderr || error.message;
-          console.error(`[MCP Tool: purgeDatabase] Error: code ${error.code}, signal ${error.signal}, msg: ${errorMessage.trim()}`);
-          resolve({ isError: true, content: [{ type: 'text', text: `Error executing ${commandName}: ${errorMessage.trim()}` }] });
+          const errorMessage = (stderr && stderr.trim().length > 0) ? stderr.trim() : error.message;
+          console.error(`[MCP Tool: purgeDatabase] CDC command "${commandName}" FAILED: Exit code ${error.code}, Signal ${error.signal}.`);
+          resolve({
+            isError: true,
+            content: [{ type: 'text', text: `Error executing CDC command "${commandName}": ${errorMessage}` }],
+          });
           return;
         }
-        console.log(`[MCP Tool: purgeDatabase] Stdout:\n${stdout}`);
-        if (stderr) console.warn(`[MCP Tool: purgeDatabase] Stderr:\n${stderr}`);
-        resolve({ content: [{ type: 'text', text: `Command "${commandName}" executed.\nStdout:\n${stdout}${stderr ? '\nStderr:\n' + stderr : ''}` }] });
+        
+        console.error(`[MCP Tool: purgeDatabase] CDC command "${commandName}" executed successfully.`);
+        resolve({
+          content: [{ type: 'text', text: `CDC command "${commandName}" completed successfully. All data should be purged. Check server logs for details.` }],
+        });
       });
     });
   },
