@@ -1,15 +1,26 @@
 require('dotenv').config();
-const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js'); // Poprawiony import zgodnie z exports
-const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js'); // Poprawiony import zgodnie z exports
+// Poprawione importy zgodnie z Twoją wcześniejszą udaną konfiguracją i analizą agenta
+const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js'); 
+const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js'); 
 
-// Import definicji narzędzi
+// Import definicji narzędzi do odczytu danych
 const listUsersTool = require('./src/tools/listUsersTool');
 const getReportedTaskAggregatesTool = require('./src/tools/getReportedTaskAggregatesTool');
-const triggerDataCollectorSyncTool = require('./src/tools/triggerDataCollectorSyncTool');
-const testArgumentsTool = require('./src/tools/testArgumentsTool'); // <--- NOWY IMPORT
 
-const SERVER_NAME = process.env.MCP_SERVER_NAME || 'MyMCPDataServer';
-const SERVER_VERSION = process.env.MCP_SERVER_VERSION || '0.0.1';
+// Usuwamy stary, generyczny trigger i testowy
+// const triggerDataCollectorSyncTool = require('./src/tools/triggerDataCollectorSyncTool');
+// const testArgumentsTool = require('./src/tools/testArgumentsTool'); // Zakładam, że ten był do testów i nie jest już potrzebny
+
+// Import nowych, specyficznych narzędzi do wywoływania komend CDC
+const triggerUserSyncTool = require('./src/tools/triggerUserSyncTool');
+const triggerTaskSyncTool = require('./src/tools/triggerTaskSyncTool');
+//const triggerAggregateGenerationTool = require('./src/tools/triggerAggregateGenerationTool'); // Pamiętaj o stworzeniu tego pliku
+const triggerFullSyncTool = require('./src/tools/triggerFullSyncTool');
+const purgeDatabaseTool = require('./src/tools/purgeDatabaseTool');
+const setUserHourlyRateTool = require('./src/tools/setUserHourlyRateTool');
+
+const SERVER_NAME = process.env.MCP_SERVER_NAME || 'ClickUpDataServer';
+const SERVER_VERSION = process.env.MCP_SERVER_VERSION || '0.1.0';
 
 async function main() {
   console.error(`[MCP Server] Initializing server: ${SERVER_NAME} v${SERVER_VERSION}`);
@@ -45,15 +56,14 @@ async function main() {
 
   // Najpierw zarejestrujmy narzędzia. Handler tools/list i tools/call powinien być obsłużony przez SDK.
   try {
+    // Narzędzia do odczytu danych
     console.error('[MCP Server] Registering tool: listUsers');
     server.tool(
       listUsersTool.name,
       listUsersTool.inputSchema, // Przekazujemy JSON Schema
       listUsersTool.handler
     );
-    // Dodajemy description do logu, bo SDK może go nie brać bezpośrednio z `tool`
-    console.error(`  - Description for listUsers: ${listUsersTool.description}`);
-
+    console.error(`  - Description for listUsers: ${listUsersTool.description}`); // Logujemy opis dla naszej wiedzy
 
     console.error('[MCP Server] Registering tool: getReportedTaskAggregates');
     server.tool(
@@ -63,13 +73,58 @@ async function main() {
     );
     console.error(`  - Description for getReportedTaskAggregates: ${getReportedTaskAggregatesTool.description}`);
 
-    console.error('[MCP Server] Registering tool: triggerDataCollectorSync');
+    // Narzędzia do wywoływania komend CDC
+    console.error('[MCP Server] Registering tool: triggerUserSync');
     server.tool(
-      triggerDataCollectorSyncTool.name,
-      triggerDataCollectorSyncTool.inputSchema,
-      triggerDataCollectorSyncTool.handler
+      triggerUserSyncTool.name,
+      triggerUserSyncTool.inputSchema,
+      triggerUserSyncTool.handler
     );
-    console.error(`  - Description for triggerDataCollectorSync: ${triggerDataCollectorSyncTool.description}`);
+    console.error(`  - Description for triggerUserSync: ${triggerUserSyncTool.description}`);
+
+    console.error('[MCP Server] Registering tool: triggerTaskSync');
+    server.tool(
+      triggerTaskSyncTool.name,
+      triggerTaskSyncTool.inputSchema,
+      triggerTaskSyncTool.handler
+    );
+    console.error(`  - Description for triggerTaskSync: ${triggerTaskSyncTool.description}`);
+    
+    // if (triggerAggregateGenerationTool) { // Upewnij się, że plik istnieje i jest poprawnie zaimportowany
+    //     console.error('[MCP Server] Registering tool: triggerAggregateGeneration');
+    //     server.tool(
+    //         triggerAggregateGenerationTool.name,
+    //         triggerAggregateGenerationTool.inputSchema,
+    //         triggerAggregateGenerationTool.handler
+    //     );
+    //     console.error(`  - Description for triggerAggregateGeneration: ${triggerAggregateGenerationTool.description}`);
+    // } else {
+    //     console.warn('[MCP Server] Warning: triggerAggregateGenerationTool.js not found or not imported. Skipping registration.');
+    // }
+
+    console.error('[MCP Server] Registering tool: triggerFullSync');
+    server.tool(
+      triggerFullSyncTool.name,
+      triggerFullSyncTool.inputSchema,
+      triggerFullSyncTool.handler
+    );
+    console.error(`  - Description for triggerFullSync: ${triggerFullSyncTool.description}`);
+    
+    console.error('[MCP Server] Registering tool: purgeDatabase');
+    server.tool(
+      purgeDatabaseTool.name,
+      purgeDatabaseTool.inputSchema,
+      purgeDatabaseTool.handler
+    );
+    console.error(`  - Description for purgeDatabase: ${purgeDatabaseTool.description}`);
+
+    console.error('[MCP Server] Registering tool: setUserHourlyRate');
+    server.tool(
+      setUserHourlyRateTool.name,
+      setUserHourlyRateTool.inputSchema,
+      setUserHourlyRateTool.handler
+    );
+    console.error(`  - Description for setUserHourlyRate: ${setUserHourlyRateTool.description}`);
 
     console.error('[MCP Server] All tools registered.');
 
@@ -81,8 +136,8 @@ async function main() {
   // Handler dla `initialize` jest automatycznie obsługiwany przez McpServer.
   // Handlery dla `tools/list` i `tools/call` SĄ AUTOMATYCZNIE generowane przez McpServer
   // na podstawie narzędzi zarejestrowanych przez `server.tool()`.
-  // Dlatego usuwamy nasze `server.setRequestHandler(...)` dla tych metod.
-
+  // Dlatego NIE używamy już `server.setRequestHandler(...)` dla tych metod.
+  
   const transport = new StdioServerTransport();
   console.error('[MCP Server] Connecting transport...');
   await server.connect(transport);
