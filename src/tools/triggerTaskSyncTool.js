@@ -1,11 +1,13 @@
 require('dotenv').config();
 const { exec } = require('child_process');
 const path = require('path');
+// Importuj parser specyficzny dla outputu komendy sync-tasks
+const { parseSyncTasksOutput } = require('../utils/cdcOutputParser');
 
 const CDC_APP_SCRIPT_PATH = process.env.CDC_APP_SCRIPT_PATH;
 
 if (!CDC_APP_SCRIPT_PATH) {
-  console.error('[MCP Tool: triggerTaskSync] ERROR: CDC_APP_SCRIPT_PATH is not set in .env for the MCP Server.');
+  console.error('[MCP Tool: triggerTaskSync] CRITICAL ERROR: CDC_APP_SCRIPT_PATH is not set in .env for the MCP Server.');
 }
 
 module.exports = {
@@ -16,66 +18,91 @@ module.exports = {
     properties: {
       listId: { 
         type: 'string', 
-        description: 'ClickUp List ID to synchronize tasks from.' 
+        description: 'ClickUp List ID (string) to synchronize tasks from.' 
       },
       fullSync: { 
         type: 'boolean', 
-        description: 'Perform a full synchronization, ignoring the last sync timestamp. Defaults to false.', 
+        description: 'Optional. Perform a full synchronization, ignoring the last sync timestamp. Defaults to false.', 
         default: false 
       },
       archived: { 
         type: 'boolean', 
-        description: 'Include archived tasks in the synchronization. Defaults to false.', 
+        description: 'Optional. Include archived tasks in the synchronization. Defaults to false.', 
         default: false 
       },
     },
-    required: ['listId'],
+    required: ['listId'], // listId jest wymagany
   },
+  // outputSchema: { /* ... można zdefiniować dla structuredContent ... */ },
   handler: async (args) => {
+    // Użyj wartości domyślnych ze schematu, jeśli argumenty nie są podane
     const safeArgs = args || {};
-    const { listId, fullSync = false, archived = false } = safeArgs; // Użyj wartości domyślnych ze schematu
+    const { listId, fullSync = false, archived = false } = safeArgs; 
     console.error(`[MCP Tool: triggerTaskSync] Received request with args: ${JSON.stringify(safeArgs)}`);
 
     if (!CDC_APP_SCRIPT_PATH) {
       return { isError: true, content: [{ type: 'text', text: 'Server configuration error: CDC_APP_SCRIPT_PATH is not set.' }] };
     }
-    if (!listId) {
+    // listId jest wymagany przez inputSchema, Yargs/MCP powinno to walidować, ale dodatkowe sprawdzenie nie zaszkodzi
+    if (!listId) { 
       return { isError: true, content: [{ type: 'text', text: 'Error: listId argument is required for triggerTaskSync.' }] };
     }
 
-    const commandName = "sync-tasks";
-    let cliCommand = `node "${path.basename(CDC_APP_SCRIPT_PATH)}" ${commandName} --listId "${listId}"`;
+    const commandNameInCDC = "sync-tasks";
+    // Budowanie komendy z argumentami
+    let cliCommandToExecute = `node "${path.basename(CDC_APP_SCRIPT_PATH)}" ${commandNameInCDC} --listId "${listId}"`;
 
-    if (fullSync) {
-      cliCommand += ` --full-sync`;
+    if (fullSync === true) { // Jawne sprawdzenie boolean
+      cliCommandToExecute += ` --full-sync`;
     }
-    if (archived) {
-      cliCommand += ` --archived`;
+    if (archived === true) { // Jawne sprawdzenie boolean
+      cliCommandToExecute += ` --archived`;
     }
 
-    const cdcAppDir = path.dirname(CDC_APP_SCRIPT_PATH);
-    const executionOptions = { timeout: 600000, cwd: cdcAppDir, env: { ...process.env } }; // 10 minut timeout
+    const cdcApplicationDirectory = path.dirname(CDC_APP_SCRIPT_PATH);
+    const executionOptions = { 
+      timeout: 600000, // 10 minut timeout dla synchronizacji zadań, może być długa
+      cwd: cdcApplicationDirectory, 
+      env: { ...process.env } 
+    };
 
-    console.error(`[MCP Tool: triggerTaskSync] Executing CDC command: ${cliCommand} in CWD: ${cdcAppDir}`);
+    console.error(`[MCP Tool: triggerTaskSync] Executing CDC command: ${cliCommandToExecute} in CWD: ${cdcApplicationDirectory}`);
 
     return new Promise((resolve) => {
-      exec(cliCommand, executionOptions, (error, stdout, stderr) => {
-        if (stdout && stdout.trim().length > 0) console.error(`[CDC Output - ${commandName} - STDOUT for list ${listId}]:\n${stdout.trim()}`);
-        if (stderr && stderr.trim().length > 0) console.error(`[CDC Output - ${commandName} - STDERR for list ${listId}]:\n${stderr.trim()}`);
+      exec(cliCommandToExecute, executionOptions, (error, stdout, stderr) => {
+        const parsedOutput = parseSyncTasksOutput(stdout, stderr);
+
+        if (parsedOutput.rawStdout && parsedOutput.rawStdout.trim().length > 0) {
+          console.error(`[CDC Output - ${commandNameInCDC} - STDOUT for list ${listId}]:\n${parsedOutput.rawStdout.trim()}`);
+        }
+        if (stderr && stderr.trim().length > 0) {
+          console.error(`[CDC Output - ${commandNameInCDC} - STDERR (raw) for list ${listId}]:\n${stderr.trim()}`);
+        }
 
         if (error) {
-          const errorMessage = (stderr && stderr.trim().length > 0) ? stderr.trim() : error.message;
-          console.error(`[MCP Tool: triggerTaskSync] CDC command "${commandName}" for list ${listId} FAILED: Exit code ${error.code}, Signal ${error.signal}.`);
+          const briefErrorMessage = (stderr && stderr.trim().length > 0) ? stderr.trim().split('\n')[0] : error.message;
+          console.error(`[MCP Tool: triggerTaskSync] CDC command "${commandNameInCDC}" for list ${listId} FAILED: Exit code ${error.code}, Signal ${error.signal}.`);
           resolve({
             isError: true,
-            content: [{ type: 'text', text: `Error executing CDC command "${commandName}" for list ${listId}: ${errorMessage}` }],
+            content: [{ type: 'text', text: `Error executing CDC command "${commandNameInCDC}" for list ${listId}: ${briefErrorMessage.substring(0, 250)}` }],
           });
           return;
         }
         
-        console.error(`[MCP Tool: triggerTaskSync] CDC command "${commandName}" for list ${listId} executed successfully.`);
+        let successMessage = `CDC command "${commandNameInCDC}" for list ${listId} completed.`;
+        if (parsedOutput.totalFetchedApi !== null) {
+            successMessage += ` Fetched approx. ${parsedOutput.totalFetchedApi} tasks/subtasks from API.`;
+        }
+        if (parsedOutput.processedNew !== null || parsedOutput.processedUpdated !== null) {
+            successMessage += ` DB: ${parsedOutput.processedNew || 0} new, ${parsedOutput.processedUpdated || 0} updated.`;
+        }
+        if (parsedOutput.parentSubtaskWarnings > 0) {
+            successMessage += ` Encountered ${parsedOutput.parentSubtaskWarnings} subtasks incorrectly marked as parent.`;
+        }
+        
+        console.error(`[MCP Tool: triggerTaskSync] CDC command "${commandNameInCDC}" for list ${listId} executed successfully.`);
         resolve({
-          content: [{ type: 'text', text: `CDC command "${commandName}" for list ${listId} completed successfully. Check server logs for details.` }],
+          content: [{ type: 'text', text: successMessage }],
         });
       });
     });
