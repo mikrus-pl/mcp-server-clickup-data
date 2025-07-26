@@ -2,7 +2,7 @@ const { db } = require('../db/database');
 
 module.exports = {
   name: 'getReportedTaskAggregates',
-  description: 'Retrieves aggregated task time report from the database. Allows filtering by client name, user ID, and month (YYYY-MM).',
+  description: 'Retrieves aggregated task time report from the database. Allows filtering by client name, user ID, and month (Polish month names in lowercase, e.g., "lipiec", "czerwiec").',
   inputSchema: {
     type: 'object',
     properties: {
@@ -77,12 +77,12 @@ module.exports = {
              // Przykład: jeśli extracted_month_from_parent_name zawiera np. "2024 Styczeń"
              // a month to "2024-01"
              // console.warn("[MCP Tool: getReportedTaskAggregates] Month filtering is complex due to format mismatch. For MVP, this filter might not work as expected unless formats align.");
-             // Możesz spróbować `query = query.where('ReportedTaskAggregates.extracted_month_from_parent_name', 'LIKE', `%${month}%`);`
+             // Możesz spróbować `query = query.where('ReportedTaskAggregates.extracted_month_from_parent_name', 'LIKE', `%${month}%`);
              // ale to słabe. Lepiej byłoby ujednolicić format `extracted_month_from_parent_name` na YYYY-MM.
              // Na razie:
-             // query = query.where('ReportedTaskAggregates.extracted_month_from_parent_name', month);
-             console.warn(`[MCP Tool: getReportedTaskAggregates] Filtering by month ('${month}') based on 'extracted_month_from_parent_name'. Ensure formats match or adjust LLM query.`);
-             query = query.where('ReportedTaskAggregates.extracted_month_from_parent_name', month);
+             // Użyj `whereRaw` dla porównania case-insensitive w SQLite, podobnie jak dla clientName
+             console.warn(`[MCP Tool: getReportedTaskAggregates] Filtering by month ('${month}') based on 'extracted_month_from_parent_name'. Comparison is case-insensitive.`);
+             query = query.whereRaw('LOWER(ReportedTaskAggregates.extracted_month_from_parent_name) = LOWER(?)', [month]);
 
          }
       }

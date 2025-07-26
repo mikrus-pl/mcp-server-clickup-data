@@ -41,7 +41,7 @@ Poniżej znajduje się lista narzędzi MCP udostępnianych przez `ClickUpDataSer
     *   **Argumenty (opcjonalne, zgodnie z `inputSchema`):**
         *   `clientName` (string): Nazwa klienta.
         *   `userId` (integer): ClickUp ID użytkownika.
-        *   `month` (string, format YYYY-MM): Miesiąc (np. "2024-03"). Uwaga: filtrowanie po miesiącu zależy od formatu pola `extracted_month_from_parent_name` w bazie danych.
+        *   `month` (string): Miesiąc w języku polskim w formie podstawowej (np. "lipiec", "czerwiec"). Porównanie jest niewrażliwe na wielkość liter. Uwaga: filtrowanie po miesiącu zależy od formatu pola `extracted_month_from_parent_name` w bazie danych, która zawiera nazwy miesięcy po polsku.
         *   `limit` (integer, domyślnie 1000): Maksymalna liczba zwracanych rekordów.
     *   **Wynik (przykładowy format w JSON):** Tablica obiektów, np.:
         ```json
