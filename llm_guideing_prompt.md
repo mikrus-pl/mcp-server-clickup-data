@@ -19,7 +19,7 @@ Poniżej znajduje się lista narzędzi MCP udostępnianych przez `ClickUpDataSer
 ### Narzędzia do Odczytu Danych (bezpośrednio z bazy CDC)
 
 1.  **`listUsers`**:
-    *   **Opis:** Zwraca listę wszystkich użytkowników z bazy danych CDC wraz z ich ostatnio zarejestrowaną (aktualną) stawką godzinową.
+    *   **Opis:** Zwraca listę wszystkich użytkowników z bazy danych CDC wraz z ich ostatnio zarejestrowaną (aktualną) stawką godzinową i przypisaną rolą (1=Owner, 2=Admin, 3=Member, 4=Guest).
     *   **Argumenty:** Brak (inputSchema: `{}`).
     *   **Wynik (przykładowy format w JSON):** Tablica obiektów, np.:
         ```json
@@ -29,6 +29,7 @@ Poniżej znajduje się lista narzędzi MCP udostępnianych przez `ClickUpDataSer
             "username": "Barbara Szpilka",
             "email": "barbara@example.com",
             "is_active": true,
+            "role": 3,
             "current_hourly_rate": 50.00,
             "rate_effective_from": "2024-01-01"
           }
@@ -104,7 +105,17 @@ Poniżej znajduje się lista narzędzi MCP udostępnianych przez `ClickUpDataSer
         *   `fromDate` (string, format YYYY-MM-DD, wymagane).
     *   **Wynik:** Tekstowe potwierdzenie ustawienia stawki.
 
-6.  **`purgeDatabase`**:
+6.  **`listUserHourlyRates`**:
+    *   **Opis:** Wyświetla wszystkie stawki godzinowe dla określonego użytkownika w CDC.
+    *   **Argumenty:** `userId` (integer, wymagane).
+    *   **Wynik:** Tekstowe podsumowanie wszystkich stawek użytkownika wraz z datami obowiązywania.
+
+7.  **`deactivateUserHourlyRate`**:
+    *   **Opis:** Dezaktywuje określoną stawkę godzinową poprzez ustawienie jej daty końcowej na wczoraj.
+    *   **Argumenty:** `rateId` (integer, wymagane).
+    *   **Wynik:** Tekstowe potwierdzenie dezaktywacji stawki.
+
+8.  **`purgeDatabase`**:
     *   **Opis:** **UWAGA: Usuwa wszystkie dane z bazy danych aplikacji CDC!** Wymaga jawnego potwierdzenia.
     *   **Argumenty:** `confirm` (boolean, wymagane, musi być ustawione na `true`).
     *   **Wynik:** Tekstowe potwierdzenie wyczyszczenia bazy lub informacja o braku potwierdzenia.

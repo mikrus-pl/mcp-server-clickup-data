@@ -18,6 +18,8 @@ const triggerTaskSyncTool = require('./src/tools/triggerTaskSyncTool');
 const triggerFullSyncTool = require('./src/tools/triggerFullSyncTool');
 const purgeDatabaseTool = require('./src/tools/purgeDatabaseTool');
 const setUserHourlyRateTool = require('./src/tools/setUserHourlyRateTool');
+const listUserHourlyRatesTool = require('./src/tools/listUserHourlyRatesTool');
+const deactivateUserHourlyRateTool = require('./src/tools/deactivateUserHourlyRateTool');
 
 const SERVER_NAME = process.env.MCP_SERVER_NAME || 'ClickUpDataServer';
 const SERVER_VERSION = process.env.MCP_SERVER_VERSION || '0.1.0';
@@ -125,6 +127,22 @@ async function main() {
       setUserHourlyRateTool.handler
     );
     console.error(`  - Description for setUserHourlyRate: ${setUserHourlyRateTool.description}`);
+
+    console.error('[MCP Server] Registering tool: listUserHourlyRates');
+    server.tool(
+      listUserHourlyRatesTool.name,
+      listUserHourlyRatesTool.inputSchema,
+      listUserHourlyRatesTool.handler
+    );
+    console.error(`  - Description for listUserHourlyRates: ${listUserHourlyRatesTool.description}`);
+
+    console.error('[MCP Server] Registering tool: deactivateUserHourlyRate');
+    server.tool(
+      deactivateUserHourlyRateTool.name,
+      deactivateUserHourlyRateTool.inputSchema,
+      deactivateUserHourlyRateTool.handler
+    );
+    console.error(`  - Description for deactivateUserHourlyRate: ${deactivateUserHourlyRateTool.description}`);
 
     console.error('[MCP Server] All tools registered.');
 

@@ -17,7 +17,7 @@ module.exports = {
       // lub pobierz wszystkich userów i wszystkie stawki i przetwórz w JS.
       // Dla MVP, pobierzemy userów, a potem dla każdego najnowszą stawkę.
       
-      const users = await db('Users').select('clickup_user_id', 'username', 'email', 'is_active');
+      const users = await db('Users').select('clickup_user_id', 'username', 'email', 'is_active', 'role');
       
       const usersWithRates = [];
       for (const user of users) {
@@ -31,6 +31,7 @@ module.exports = {
           username: user.username,
           email: user.email,
           is_active: user.is_active,
+          role: user.role,
           current_hourly_rate: latestRate ? latestRate.hourly_rate : null,
           rate_effective_from: latestRate ? latestRate.effective_from_date : null,
         });
