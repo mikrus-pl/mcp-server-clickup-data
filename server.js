@@ -1,3 +1,5 @@
+// src/server.js
+
 require('dotenv').config();
 // Poprawione importy zgodnie z Twoją wcześniejszą udaną konfiguracją i analizą agenta
 const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js'); 
