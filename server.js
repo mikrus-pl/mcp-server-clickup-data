@@ -21,6 +21,10 @@ const setUserHourlyRateTool = require('./src/tools/setUserHourlyRateTool');
 const listUserHourlyRatesTool = require('./src/tools/listUserHourlyRatesTool');
 const deactivateUserHourlyRateTool = require('./src/tools/deactivateUserHourlyRateTool');
 
+// Import new invoice tools
+const createInvoiceTool = require('./src/tools/createInvoiceTool');
+const listInvoicesTool = require('./src/tools/listInvoicesTool');
+
 const SERVER_NAME = process.env.MCP_SERVER_NAME || 'ClickUpDataServer';
 const SERVER_VERSION = process.env.MCP_SERVER_VERSION || '0.1.0';
 
@@ -143,6 +147,23 @@ async function main() {
       deactivateUserHourlyRateTool.handler
     );
     console.error(`  - Description for deactivateUserHourlyRate: ${deactivateUserHourlyRateTool.description}`);
+
+    // Register new invoice tools
+    console.error('[MCP Server] Registering tool: createInvoice');
+    server.tool(
+      createInvoiceTool.name,
+      createInvoiceTool.inputSchema,
+      createInvoiceTool.handler
+    );
+    console.error(`  - Description for createInvoice: ${createInvoiceTool.description}`);
+
+    console.error('[MCP Server] Registering tool: listInvoices');
+    server.tool(
+      listInvoicesTool.name,
+      listInvoicesTool.inputSchema,
+      listInvoicesTool.handler
+    );
+    console.error(`  - Description for listInvoices: ${listInvoicesTool.description}`);
 
     console.error('[MCP Server] All tools registered.');
 
