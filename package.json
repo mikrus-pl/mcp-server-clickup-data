@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
+    "start": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -10,6 +11,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@modelcontextprotocol/inspector": "^0.16.2",
     "@modelcontextprotocol/sdk": "^1.11.1",
     "dotenv": "^16.5.0",
     "knex": "^3.1.0",

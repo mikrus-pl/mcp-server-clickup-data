@@ -16,10 +16,6 @@ module.exports = {
   inputSchema: {
     type: 'object',
     properties: {
-      listId: { 
-        type: 'string', 
-        description: 'ClickUp List ID (string) to synchronize tasks from.' 
-      },
       fullSync: { 
         type: 'boolean', 
         description: 'Optional. Perform a full synchronization, ignoring the last sync timestamp. Defaults to false.', 
@@ -31,21 +27,32 @@ module.exports = {
         default: false 
       },
     },
-    required: ['listId'], // listId jest wymagany
+    required: [],
   },
   // outputSchema: { /* ... można zdefiniować dla structuredContent ... */ },
   handler: async (args) => {
     // Użyj wartości domyślnych ze schematu, jeśli argumenty nie są podane
     const safeArgs = args || {};
-    const { listId, fullSync = false, archived = false } = safeArgs; 
-    console.error(`[MCP Tool: triggerTaskSync] Received request with args: ${JSON.stringify(safeArgs)}`);
+    
+    console.error(`[MCP Tool: triggerTaskSync] DEBUG: Raw args received: ${JSON.stringify(args)}`);
+    console.error(`[MCP Tool: triggerTaskSync] DEBUG: Safe args object: ${JSON.stringify(safeArgs)}`);
+    console.error(`[MCP Tool: triggerTaskSync] DEBUG: Available keys in args: ${Object.keys(safeArgs)}`);
+    
+    const { fullSync = false, archived = false } = safeArgs; 
+    
+    // Load listId from environment variable
+    const listId = process.env.CLICKUP_LIST_ID;
+    console.error(`[MCP Tool: triggerTaskSync] DEBUG: Loaded listId from environment: ${listId}`);
+    console.error(`[MCP Tool: triggerTaskSync] DEBUG: fullSync value: ${fullSync}`);
+    console.error(`[MCP Tool: triggerTaskSync] DEBUG: archived value: ${archived}`);
 
     if (!CDC_APP_SCRIPT_PATH) {
       return { isError: true, content: [{ type: 'text', text: 'Server configuration error: CDC_APP_SCRIPT_PATH is not set.' }] };
     }
-    // listId jest wymagany przez inputSchema, Yargs/MCP powinno to walidować, ale dodatkowe sprawdzenie nie zaszkodzi
+    // Check if listId is set in environment
+    console.error(`[MCP Tool: triggerTaskSync] DEBUG: Checking if listId is valid. listId=${listId}, is falsy=${!listId}`);
     if (!listId) { 
-      return { isError: true, content: [{ type: 'text', text: 'Error: listId argument is required for triggerTaskSync.' }] };
+      return { isError: true, content: [{ type: 'text', text: 'Error: CLICKUP_LIST_ID is not set in environment variables.' }] };
     }
 
     const commandNameInCDC = "sync-tasks";

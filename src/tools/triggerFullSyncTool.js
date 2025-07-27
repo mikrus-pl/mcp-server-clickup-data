@@ -14,10 +14,6 @@ module.exports = {
   inputSchema: {
     type: 'object',
     properties: {
-      listId: { 
-        type: 'string', 
-        description: 'ClickUp List ID (string) to perform the full synchronization for.' 
-      },
       // Można dodać `archived`, jeśli komenda `full-sync` w CDC została dostosowana do przyjmowania tej flagi
       // i przekazywania jej do kroku `sync-tasks`.
       // archived: { 
@@ -26,20 +22,21 @@ module.exports = {
       //   default: false 
       // }
     },
-    required: ['listId'],
+    required: [],
   },
   // outputSchema: { /* ... */ },
   handler: async (args) => {
     const safeArgs = args || {};
-    // const { listId, archived = false } = safeArgs; // Jeśli dodasz `archived` do inputSchema
-    const { listId } = safeArgs; 
     console.error(`[MCP Tool: triggerFullSync] Received request with args: ${JSON.stringify(safeArgs)}`);
+    
+    // Load listId from environment variable
+    const listId = process.env.CLICKUP_LIST_ID;
 
     if (!CDC_APP_SCRIPT_PATH) {
       return { isError: true, content: [{ type: 'text', text: 'Server configuration error: CDC_APP_SCRIPT_PATH is not set.' }] };
     }
     if (!listId) {
-      return { isError: true, content: [{ type: 'text', text: 'Error: listId argument is required for triggerFullSync.' }] };
+      return { isError: true, content: [{ type: 'text', text: 'Error: CLICKUP_LIST_ID is not set in environment variables.' }] };
     }
 
     const commandNameInCDC = "full-sync";

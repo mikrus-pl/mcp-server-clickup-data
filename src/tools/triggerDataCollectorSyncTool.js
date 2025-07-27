@@ -20,10 +20,6 @@ module.exports = {
         description: 'The CDC command to execute.',
         enum: ["sync-users", "sync-tasks", "generate-aggregates", "full-sync", "setup-db", "purge-data"], // Dodajmy więcej, jeśli trzeba
       },
-      listId: {
-        type: 'string',
-        description: 'ClickUp List ID (required for "sync-tasks", "generate-aggregates", "full-sync"). Optional otherwise.'
-      },
       fullSyncFlag: {
           type: 'boolean',
           description: 'Set to true to force full sync for "sync-tasks". Defaults to false.',
@@ -39,8 +35,11 @@ module.exports = {
   },
   handler: async (args) => {
     const safeArgs = args || {};
-    const { commandName, listId, fullSyncFlag, confirmFlag } = safeArgs; // Dodajemy confirmFlag
+    const { commandName, fullSyncFlag, confirmFlag } = safeArgs; // Dodajemy confirmFlag
+    // Load listId from environment variable
+    const listId = process.env.CLICKUP_LIST_ID;
     console.error(`[MCP Tool: triggerDataCollectorSync] Received request with args:`, JSON.stringify(safeArgs));
+    console.error(`[MCP Tool: triggerDataCollectorSync] Loaded listId from environment: ${listId}`);
 
     if (!commandName) {
         console.error('[MCP Tool: triggerDataCollectorSync] Error: commandName is undefined or missing.');
@@ -59,13 +58,14 @@ module.exports = {
 
     let cliCommand = `node "${path.basename(CDC_APP_SCRIPT_PATH)}" ${commandName}`; // Użyj tylko nazwy pliku, cwd załatwi resztę
 
-    if (listId && (commandName === 'sync-tasks' || commandName === 'generate-aggregates' || commandName === 'full-sync')) {
-      cliCommand += ` --listId ${listId}`;
-    } else if (!listId && (commandName === 'sync-tasks' || commandName === 'generate-aggregates' || commandName === 'full-sync')) {
+    if ((commandName === 'sync-tasks' || commandName === 'generate-aggregates' || commandName === 'full-sync')) {
+      if (!listId) {
         return {
             isError: true,
-            content: [{ type: 'text', text: `Error: listId is required for command "${commandName}".` }],
+            content: [{ type: 'text', text: `Error: CLICKUP_LIST_ID is not set in environment variables. Required for command "${commandName}".` }],
         };
+      }
+      cliCommand += ` --listId ${listId}`;
     }
 
     if (commandName === 'sync-tasks' && fullSyncFlag) {

@@ -21,13 +21,16 @@ This analysis details which CDC (ClickUp Data Collector) commands are available 
 **Availability**: ✅ Fully Available
 
 **Parameters**:
-- `listId` (string, required) - Provided by LLM/client
 - `fullSync` (boolean, optional, default: false) - Provided by LLM/client
 - `archived` (boolean, optional, default: false) - Provided by LLM/client
 
+**Environment Variable**:
+- `CLICKUP_LIST_ID` (string, required) - Loaded from server environment
+
 **Implementation Details**:
-- The tool executes the CDC command `node app.js sync-tasks --listId "<listId>" [--full-sync] [--archived]`
-- All parameters are provided by the LLM/client calling the tool
+- The tool executes the CDC command `node app.js sync-tasks --listId "<CLICKUP_LIST_ID>" [--full-sync] [--archived]`
+- The `listId` parameter is loaded from the `CLICKUP_LIST_ID` environment variable
+- Other parameters are provided by the LLM/client calling the tool
 - Server configuration comes from environment (`CDC_APP_SCRIPT_PATH`)
 
 ### 3. user-rate set
@@ -48,12 +51,12 @@ This analysis details which CDC (ClickUp Data Collector) commands are available 
 **MCP Tool**: `triggerFullSync`
 **Availability**: ✅ Fully Available
 
-**Parameters**:
-- `listId` (string, required) - Provided by LLM/client
+**Environment Variable**:
+- `CLICKUP_LIST_ID` (string, required) - Loaded from server environment
 
 **Implementation Details**:
-- The tool executes the CDC command `node app.js full-sync --listId "<listId>"`
-- The `listId` parameter is provided by the LLM/client
+- The tool executes the CDC command `node app.js full-sync --listId "<CLICKUP_LIST_ID>"`
+- The `listId` parameter is loaded from the `CLICKUP_LIST_ID` environment variable
 - Server configuration comes from environment (`CDC_APP_SCRIPT_PATH`)
 
 ### 5. purge-data
@@ -107,13 +110,15 @@ This analysis details which CDC (ClickUp Data Collector) commands are available 
 
 **Parameters for execution**:
 - `commandName` (string, required, must be "generate-aggregates") - Provided by LLM/client
-- `listId` (string, optional) - Provided by LLM/client
 - `userId` (integer, optional) - Not directly supported, would need to use generic tool
+
+**Environment Variable**:
+- `CLICKUP_LIST_ID` (string, required for this command) - Loaded from server environment
 
 **Implementation Details**:
 - Available through the generic `triggerDataCollectorSync` tool
 - The LLM/client must specify `commandName: "generate-aggregates"`
-- The `listId` parameter can be provided if needed
+- The `listId` parameter is loaded from the `CLICKUP_LIST_ID` environment variable
 - No direct parameter for `userId` filtering (would need to be implemented)
 - Server configuration comes from environment (`CDC_APP_SCRIPT_PATH`)
 

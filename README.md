@@ -25,6 +25,8 @@ Serwer MCP umożliwia Large Language Model (LLM) dostęp do przetworzonych danyc
 │   ├── db/              # obsługa bazy danych (np. database.js)
 │   ├── tools/           # narzędzia do obsługi danych i komend
 │   └── utils/           # pomocnicze funkcje
+├── tests/               # skrypty pomocnicze do testowania
+├── docs/                # dokumentacja (uwaga: pliki w tym katalogu mogą nie być w pełni aktualne, wiedza z nich powinna być weryfikowana przed użyciem)
 ```
 
 ## Wymagania
