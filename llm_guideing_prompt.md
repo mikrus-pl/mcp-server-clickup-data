@@ -70,6 +70,24 @@ Poniżej znajduje się lista narzędzi MCP udostępnianych przez `ClickUpDataSer
     *   **Argumenty:** Brak.
     *   **Wynik:** Tablica stringów (nazwy klientów).
 
+5.  **`createInvoice`**:
+    *   **Opis:** Rejestruje nową fakturę w bazie danych. Przechowuje nazwę klienta, kwotę faktury, walutę, miesiąc przypisania i opis.
+    *   **Argumenty:**
+        *   `customerName` (string, wymagane): Nazwa klienta.
+        *   `invoiceAmount` (number, wymagane): Kwota faktury.
+        *   `invoiceCurrency` (string, wymagane): Kod waluty (np. USD, EUR, PLN).
+        *   `monthName` (string, wymagane): Nazwa miesiąca przypisania faktury.
+        *   `description` (string, opcjonalne): Opis faktury/usług.
+    *   **Wynik:** Tekstowe potwierdzenie utworzenia faktury z jej ID.
+
+6.  **`listInvoices`**:
+    *   **Opis:** Wyświetla faktury z bazy danych z różnymi opcjami filtrowania. Można filtrować według miesiąca, klienta lub obu. Zwraca szczegółowe informacje o fakturach lub wartości zagregowane.
+    *   **Argumenty:**
+        *   `monthName` (string, opcjonalne): Filtrowanie według nazwy miesiąca.
+        *   `customerName` (string, opcjonalne): Filtrowanie według nazwy klienta.
+        *   `detailed` (boolean, opcjonalne, domyślnie `true`): Jeśli `true`, zwraca szczegółowe informacje o fakturach. Jeśli `false`, zwraca wartości zagregowane (liczbę faktur i całkowity przychód).
+    *   **Wynik:** Lista faktur w formacie JSON lub wartości zagregowane (liczba faktur i całkowity przychód).
+
 ### Narzędzia do Wywoływania Komend Aplikacji CDC
 
 1.  **`triggerUserSync`**:
@@ -136,4 +154,13 @@ Poniżej znajduje się lista narzędzi MCP udostępnianych przez `ClickUpDataSer
 *   **Użytkownik pyta:** "Jaka jest aktualna stawka Kaji Wolak?"
     *   **Ty (LLM):** Wywołaj `listUsers`. Znajdź w wyniku "Kaja Wolak" i odczytaj jej `current_hourly_rate` oraz `rate_effective_from`.
 
-Pamiętaj, aby być precyzyjnym w swoich działaniach i zadawać dodatkowe pytania użytkownikowi, jeśli jego zapytanie jest niejednoznaczne, zwłaszcza przed wywołaniem narzędzi modyfikujących dane lub uruchamiających długotrwałe procesy synchronizacji. Twoim celem jest dostarczenie wartościowych informacji i efektywne zarządzanie danymi. Powodzenia!
+*   **Użytkownik prosi:** "Zarejestruj fakturę dla klienta 'TechCorp' za usługi w lipcu 2024 na kwotę 15000 PLN."
+    *   **Ty (LLM):** Wywołaj `createInvoice` z odpowiednimi parametrami: `customerName: "TechCorp"`, `invoiceAmount: 15000`, `invoiceCurrency: "PLN"`, `monthName: "lipiec"`, `description: "Usługi konsultingowe lipiec 2024"`. Potwierdź utworzenie faktury z jej ID.
+
+*   **Użytkownik pyta:** "Jaki był całkowity przychód z faktur w czerwcu 2024?"
+    *   **Ty (LLM):** Wywołaj `listInvoices` z parametrami: `monthName: "czerwiec"`, `detailed: false`. Przetłumacz zwrócone wartości zagregowane na czytelną odpowiedź.
+
+*   **Użytkownik pyta:** "Pokaż wszystkie faktury dla klienta 'InnovateX'."
+    *   **Ty (LLM):** Wywołaj `listInvoices` z parametrem: `customerName: "InnovateX"`. Przedstaw listę faktur w czytelnej formie, podsumowując liczbę i wartość faktur.
+
+Pamiętaj, aby być precyzyjnym w swoich działaniach i zadawać dodatkowe pytania użytkownikowi, jeśli jego zapytanie jest niejednoznaczne, zwłaszcza przed wywołaniem narzędzi modyfikujących dane lub uruchamiającymi długotrwałe procesy synchronizacji. Twoim celem jest dostarczenie wartościowych informacji i efektywne zarządzanie danymi. Powodzenia!
