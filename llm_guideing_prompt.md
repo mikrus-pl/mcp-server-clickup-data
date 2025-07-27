@@ -98,18 +98,18 @@ Poniżej znajduje się lista narzędzi MCP udostępnianych przez `ClickUpDataSer
 2.  **`triggerTaskSync`**:
     *   **Opis:** Uruchamia proces synchronizacji zadań dla określonej listy ClickUp w CDC. ID listy jest ładowane z zmiennej środowiskowej `CLICKUP_LIST_ID`.
     *   **Argumenty:**
-        *   `fullSync` (boolean, opcjonalne, domyślnie `false`): Czy przeprowadzić pełną synchronizację.
+        *   `fullSync` (boolean, opcjonalne, domyślnie `false`): Czy przeprowadzić pełną synchronizację i nadpisać istniejące dane. Gdy false synchronizacja odbywa się w trybie update'u danych.
         *   `archived` (boolean, opcjonalne, domyślnie `false`): Czy dołączyć zadania zarchiwizowane.
     *   **Wynik:** Tekstowe potwierdzenie wykonania i podsumowanie (np. liczba pobranych/przetworzonych zadań, ewentualne warningi).
 
 3.  **`triggerAggregateGeneration`**:
-    *   **Opis:** Uruchamia proces generowania agregatów czasowych w CDC (tabela `ReportedTaskAggregates`). Zalecane po `triggerTaskSync`. ID listy jest ładowane z zmiennej środowiskowej `CLICKUP_LIST_ID`.
+    *   **Opis:** Uruchamia proces generowania agregatów czasowych w CDC (tabela `ReportedTaskAggregates`). Zalecane po `triggerTaskSync`. 
     *   **Argumenty (opcjonalne):**
         *   `userId` (integer): ClickUp ID użytkownika.
     *   **Wynik:** Tekstowe potwierdzenie wykonania i podsumowanie (np. liczba wygenerowanych agregatów, pominięte zadania).
 
 4.  **`triggerFullSync`**:
-    *   **Opis:** Uruchamia pełny proces synchronizacji w CDC dla danej listy: synchronizuje użytkowników, następnie zadania (w trybie `--full-sync`), a na końcu generuje agregaty. ID listy jest ładowane z zmiennej środowiskowej `CLICKUP_LIST_ID`.
+    *   **Opis:** Uruchamia pełny proces synchronizacji w CDC dla danej listy z ClickUp: synchronizuje użytkowników, następnie zadania (w trybie `--full-sync`), a na końcu generuje agregaty. ID listy jest ładowane z zmiennej środowiskowej `CLICKUP_LIST_ID`.
     *   **Argumenty:** Brak.
     *   **Wynik:** Ogólne tekstowe potwierdzenie wykonania sekwencji operacji.
 

@@ -2,7 +2,7 @@ const { db } = require('../db/database');
 
 module.exports = {
   name: 'getReportedTaskAggregates',
-  description: 'Retrieves aggregated task time report from the database. Allows filtering by client name, user ID, and month (Polish month names in lowercase, e.g., "lipiec", "czerwiec").',
+  description: 'Retrieves aggregated task time report from the database. Allows filtering by client name, user ID, and month (Polish month names, e.g., "kwiecień", "lipiec").',
   inputSchema: {
     type: 'object',
     properties: {
@@ -16,8 +16,7 @@ module.exports = {
       },
       month: { 
         type: 'string', 
-        pattern: '^\\d{4}-(0[1-9]|1[0-2])$', // Format YYYY-MM
-        description: 'Filter by month of the parent task (e.g., "2024-03"). Optional.' 
+        description: 'Filter by month name in Polish (e.g., "kwiecień", "lipiec"). Case-insensitive. Optional.' 
       },
       limit: {
         type: 'integer',
@@ -56,35 +55,12 @@ module.exports = {
         query = query.where('ReportedTaskAggregates.reported_for_user_id', userId);
       }
       if (month) {
-        // Zakładamy, że extracted_month_from_parent_name przechowuje nazwę miesiąca np. "styczeń"
-        // lub numer. Jeśli to nazwa, a filtr `month` to YYYY-MM, potrzebujemy mapowania.
-        // Na razie załóżmy, że `extracted_month_from_parent_name` to coś, co można porównać z `month`
-        // lub że LLM poda odpowiedni format.
-        // Dla prostoty, jeśli `extracted_month_from_parent_name` to np. "2024-Marzec", a `month` to "2024-03"
-        // to bezpośrednie porównanie nie zadziała.
-        // W specyfikacji mieliśmy `extracted_month_from_name` (TEXT, NULLABLE) - Nazwa miesiąca (np. "styczeń", "luty") lub numer miesiąca (1-12)
-        // TODO: Doprecyzować jak filtrować po miesiącu, jeśli `month` jest YYYY-MM, a w bazie jest np. "marzec".
-        // Na razie proste porównanie, zakładając, że formaty są spójne lub LLM sobie poradzi.
-        // Jeśli `extracted_month_from_parent_name` zawiera tylko nazwę miesiąca, a `month` to YYYY-MM,
-        // to musimy inaczej filtrować (np. po `last_calculated_at` lub parsować datę z nazwy zadania).
-        // Dla MVP załóżmy, że filtr `month` odnosi się do `extracted_month_from_parent_name`
-        // i jeśli to YYYY-MM, to LLM musi wiedzieć, że to może nie pasować do formatu w bazie.
-        // Lepsze: jeśli `month` to YYYY-MM, filtruj po `strftime('%Y-%m', last_calculated_at)` lub podobnie,
-        // albo zmień `extracted_month_from_parent_name` na format YYYY-MM.
-        // Na razie, jeśli `month` jest, spróbujmy dopasować do `extracted_month_from_parent_name` lub `parent_task_name`.
-        // To wymaga przemyślenia. Na razie pomińmy filtrowanie po `month` w kodzie, jeśli nie jest to proste.
-         if (month) {
-             // Przykład: jeśli extracted_month_from_parent_name zawiera np. "2024 Styczeń"
-             // a month to "2024-01"
-             // console.warn("[MCP Tool: getReportedTaskAggregates] Month filtering is complex due to format mismatch. For MVP, this filter might not work as expected unless formats align.");
-             // Możesz spróbować `query = query.where('ReportedTaskAggregates.extracted_month_from_parent_name', 'LIKE', `%${month}%`);
-             // ale to słabe. Lepiej byłoby ujednolicić format `extracted_month_from_parent_name` na YYYY-MM.
-             // Na razie:
-             // Użyj `whereRaw` dla porównania case-insensitive w SQLite, podobnie jak dla clientName
-             console.warn(`[MCP Tool: getReportedTaskAggregates] Filtering by month ('${month}') based on 'extracted_month_from_parent_name'. Comparison is case-insensitive.`);
-             query = query.whereRaw('LOWER(ReportedTaskAggregates.extracted_month_from_parent_name) = LOWER(?)', [month]);
-
-         }
+        // Filter by Polish month name (e.g., "kwiecień", "lipiec")
+        // The database field `extracted_month_from_parent_name` contains Polish month names
+        // TODO: In the future, consider standardizing to YYYY-MM format for more precise filtering
+        // For now, we perform a case-insensitive comparison with the Polish month names in the database
+        console.warn(`[MCP Tool: getReportedTaskAggregates] Filtering by month ('${month}') based on 'extracted_month_from_parent_name'. Comparison is case-insensitive.`);
+        query = query.whereRaw('LOWER(ReportedTaskAggregates.extracted_month_from_parent_name) = LOWER(?)', [month]);
       }
 
       const results = await query;
