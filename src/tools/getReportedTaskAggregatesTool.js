@@ -17,31 +17,34 @@ function logToFile(message) {
   fs.appendFileSync(logFilePath, logMessage);
 }
 
+// Proper Zod schema with updated MCP SDK and Zod versions
+const inputSchema = z.object({
+  clientName: z.string()
+    .describe('Filter by client name (exact match, case-insensitive for query). Optional.')
+    .optional(),
+  userId: z.number().int()
+    .describe('Filter by ClickUp User ID. Optional.')
+    .optional(),
+  month: z.string()
+    .describe('Filter by month name in Polish (e.g., "kwiecień", "lipiec"). Case-insensitive. Optional.')
+    .optional(),
+  limit: z.number().int()
+    .describe('Limit the number of results (e.g., 100). Optional, defaults to 1000 if not provided.')
+    .optional()
+    .default(1000),
+});
+
 module.exports = {
   name: 'getReportedTaskAggregates',
   description: 'Retrieves aggregated task time report from the database. Allows filtering by client name, user ID, and month (Polish month names, e.g., "kwiecień", "lipiec").',
-  inputSchema: z.object({
-    clientName: z.string()
-      .describe('Filter by client name (exact match, case-insensitive for query). Optional.')
-      .optional(),
-    userId: z.number().int()
-      .describe('Filter by ClickUp User ID. Optional.')
-      .optional(),
-    month: z.string()
-      .describe('Filter by month name in Polish (e.g., "kwiecień", "lipiec"). Case-insensitive. Optional.')
-      .optional(),
-    limit: z.number().int()
-      .describe('Limit the number of results (e.g., 100). Optional, defaults to a server-side limit if not provided.')
-      .optional()
-      .default(1000),
-  }),
+  inputSchema,
   handler: async (args) => {
     // Log raw arguments received
     logToFile(`RECEIVED ARGS: ${JSON.stringify(args)}`);
     console.error(`[MCP Tool: getReportedTaskAggregates] Received request with filters:`, args);
     
     // Extract parameters with detailed logging
-    const clientName = args.clientName || args.client || null;
+    const clientName = args.clientName || null;
     const userId = args.userId || null;
     const month = args.month || null;
     const limit = args.limit ? Math.min(args.limit, 5000) : 1000;

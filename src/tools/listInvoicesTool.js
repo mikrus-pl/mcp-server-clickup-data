@@ -1,42 +1,27 @@
 const { db } = require('../db/database');
+const { z } = require('zod');
 
 module.exports = {
   name: 'listInvoices',
   description: 'Lists invoices from the database with various filtering options. Can filter by month, customer, or both. Returns detailed invoice information.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      monthName: { 
-        type: 'string', 
-        description: 'Filter by month name to list all invoices for a selected month.' 
-      },
-      customerName: { 
-        type: 'string', 
-        description: 'Filter by customer name to list all invoices for a selected customer.' 
-      },
-      detailed: { 
-        type: 'boolean', 
-        description: 'If true, returns detailed invoice information. If false, returns aggregated values (count and total). Defaults to true.',
-        default: true
-      }
-    },
-    required: [],
-  },
+  inputSchema: z.object({
+    monthName: z.string()
+      .describe('Filter by month name to list all invoices for a selected month.')
+      .optional(),
+    customerName: z.string()
+      .describe('Filter by customer name to list all invoices for a selected customer.')
+      .optional(),
+    detailed: z.boolean()
+      .describe('If true, returns detailed invoice information. If false, returns aggregated values (count and total).')
+      .optional()
+      .default(true),
+  }),
   handler: async (args) => {
-    const safeArgs = args || {};
-    const { monthName, customerName, detailed = true } = safeArgs;
-    console.error(`[MCP Tool: listInvoices] Received request with args: ${JSON.stringify(safeArgs)}`);
+    // The `detailed` argument will be `true` even if the client didn't send it.
+    const { monthName, customerName, detailed } = args;
+    console.error(`[MCP Tool: listInvoices] Received request with args: ${JSON.stringify(args)}`);
 
-    // Validate data types
-    if (monthName && typeof monthName !== 'string') {
-      return { isError: true, content: [{ type: 'text', text: 'Invalid argument type. Ensure monthName is a string.' }] };
-    }
-    if (customerName && typeof customerName !== 'string') {
-      return { isError: true, content: [{ type: 'text', text: 'Invalid argument type. Ensure customerName is a string.' }] };
-    }
-    if (typeof detailed !== 'boolean') {
-      return { isError: true, content: [{ type: 'text', text: 'Invalid argument type. Ensure detailed is a boolean.' }] };
-    }
+    // No need for manual validation or setting defaults like `detailed = true`
 
     try {
       let query = db('Invoices');

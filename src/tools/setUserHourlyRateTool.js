@@ -6,37 +6,23 @@ const { z } = require('zod');
 const CDC_APP_SCRIPT_PATH = process.env.CDC_APP_SCRIPT_PATH;
 if (!CDC_APP_SCRIPT_PATH) console.error('[MCP Tool: setUserHourlyRate] ERROR: CDC_APP_SCRIPT_PATH not set.');
 
-const inputSchema = z.object({
-  userId: z.number('The ClickUp User ID (numeric) for whom to set the rate.'),
-  rate: z.number('The new hourly rate as a number (e.g., 30 or 30.50).'),
-  fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date from which the rate is effective, in YYYY-MM-DD format.'),
-});
-
 module.exports = {
   name: 'setUserHourlyRate',
   description: 'Sets a new hourly rate for a user in the ClickUp Data Collector application. Requires userId, rate, and fromDate (YYYY-MM-DD).',
-  inputSchema,
+  inputSchema: z.object({
+    userId: z.number().int()
+      .describe('The ClickUp User ID (numeric) for whom to set the rate.'),
+    rate: z.number()
+      .describe('The new hourly rate as a number (e.g., 30 or 30.50).'),
+    fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+      .describe('Date from which the rate is effective, in YYYY-MM-DD format.'),
+  }),
   handler: async (args) => {
-    const safeArgs = inputSchema.safeParse(args);
-    if (!safeArgs.success) {
-      return { isError: true, content: [{ type: 'text', text: `Invalid input: ${safeArgs.error.issues[0].message}` }] };
-    }
-    const { userId, rate, fromDate } = safeArgs.data;
-    console.error(`[MCP Tool: setUserHourlyRate] Received request with args: ${JSON.stringify(safeArgs.data)}`);
+    const { userId, rate, fromDate } = args;
+    console.error(`[MCP Tool: setUserHourlyRate] Received validated request with args: ${JSON.stringify(args)}`);
 
     if (!CDC_APP_SCRIPT_PATH) {
       return { isError: true, content: [{ type: 'text', text: 'Server configuration error: CDC_APP_SCRIPT_PATH is not set.' }] };
-    }
-    if (userId === undefined || rate === undefined || fromDate === undefined) {
-        return { isError: true, content: [{ type: 'text', text: 'Error: userId, rate, and fromDate arguments are all required.'}] };
-    }
-    if (typeof userId !== 'number' || typeof rate !== 'number' || !String(fromDate).match(/^\d{4}-\d{2}-\d{2}$/)) {
-        // Dodatkowa walidacja typów i formatu daty
-        let validationError = "Invalid argument types or format. Ensure: ";
-        if (typeof userId !== 'number') validationError += "userId is an integer; ";
-        if (typeof rate !== 'number') validationError += "rate is a number; ";
-        if (!String(fromDate).match(/^\d{4}-\d{2}-\d{2}$/)) validationError += "fromDate is YYYY-MM-DD format.";
-        return { isError: true, content: [{ type: 'text', text: validationError }] };
     }
 
     const commandName = "user-rate set";

@@ -1,72 +1,29 @@
 const { db } = require('../db/database');
+const { z } = require('zod');
 
 module.exports = {
   name: 'createInvoice',
   description: 'Registers a new invoice in the database. Stores customer name, invoice amount, currency, month assignment, and description.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      customerName: { 
-        type: 'string', 
-        description: 'Name of the customer for the invoice.' 
-      },
-      invoiceAmount: { 
-        type: 'number', 
-        description: 'Invoice amount with up to 12 digits and 2 decimal places.' 
-      },
-      invoiceCurrency: { 
-        type: 'string', 
-        description: 'Currency code (e.g., USD, EUR, PLN).' 
-      },
-      monthName: { 
-        type: 'string', 
-        description: 'Month name to know which month it should be assigned to.' 
-      },
-      description: { 
-        type: 'string', 
-        description: 'Description of invoices/services provided.' 
-      }
-    },
-    required: ['customerName', 'invoiceAmount', 'invoiceCurrency', 'monthName'],
-  },
+  
+  inputSchema: z.object({
+    customerName: z.string()
+      .describe('Name of the customer for the invoice.'),
+    invoiceAmount: z.number()
+      .describe('Invoice amount with up to 12 digits and 2 decimal places.'),
+    invoiceCurrency: z.string()
+      .describe('Currency code (e.g., USD, EUR, PLN).'),
+    monthName: z.string()
+      .describe('Month name to know which month it should be assigned to.'),
+    description: z.string()
+      .describe('Optional description of invoices/services provided.')
+      .optional(),
+  }),
   handler: async (args) => {
-    const safeArgs = args || {};
-    const { customerName, invoiceAmount, invoiceCurrency, monthName, description } = safeArgs;
-    console.error(`[MCP Tool: createInvoice] Received request with args: ${JSON.stringify(safeArgs)}`);
-
-    // Validate required arguments
-    if (!customerName) {
-      return { isError: true, content: [{ type: 'text', text: 'Error: customerName argument is required.' }] };
-    }
-    if (invoiceAmount === undefined) {
-      return { isError: true, content: [{ type: 'text', text: 'Error: invoiceAmount argument is required.' }] };
-    }
-    if (!invoiceCurrency) {
-      return { isError: true, content: [{ type: 'text', text: 'Error: invoiceCurrency argument is required.' }] };
-    }
-    if (!monthName) {
-      return { isError: true, content: [{ type: 'text', text: 'Error: monthName argument is required.' }] };
-    }
-
-    // Validate data types
-    if (typeof customerName !== 'string') {
-      return { isError: true, content: [{ type: 'text', text: 'Invalid argument type. Ensure customerName is a string.' }] };
-    }
-    if (typeof invoiceAmount !== 'number') {
-      return { isError: true, content: [{ type: 'text', text: 'Invalid argument type. Ensure invoiceAmount is a number.' }] };
-    }
-    if (typeof invoiceCurrency !== 'string') {
-      return { isError: true, content: [{ type: 'text', text: 'Invalid argument type. Ensure invoiceCurrency is a string.' }] };
-    }
-    if (typeof monthName !== 'string') {
-      return { isError: true, content: [{ type: 'text', text: 'Invalid argument type. Ensure monthName is a string.' }] };
-    }
-    if (description && typeof description !== 'string') {
-      return { isError: true, content: [{ type: 'text', text: 'Invalid argument type. Ensure description is a string.' }] };
-    }
+    // No need to check for existence or type of args, Zod did it for you!
+    const { customerName, invoiceAmount, invoiceCurrency, monthName, description } = args;
+    console.error(`[MCP Tool: createInvoice] Received validated request with args: ${JSON.stringify(args)}`);
 
     try {
-      // Insert the new invoice into the database
       const [invoiceId] = await db('Invoices').insert({
         customer_name: customerName,
         invoice_amount: invoiceAmount,
@@ -74,7 +31,7 @@ module.exports = {
         month_name: monthName,
         entry_creation_date: new Date().toISOString(),
         date_last_updated: new Date().toISOString(),
-        description: description || ''
+        description: description || null // Handle optional field for DB
       });
 
       console.error(`[MCP Tool: createInvoice] Successfully created invoice with ID: ${invoiceId}`);

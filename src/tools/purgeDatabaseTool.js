@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { exec } = require('child_process');
 const path = require('path');
+const { z } = require('zod');
 
 const CDC_APP_SCRIPT_PATH = process.env.CDC_APP_SCRIPT_PATH;
 if (!CDC_APP_SCRIPT_PATH) console.error('[MCP Tool: purgeDatabase] ERROR: CDC_APP_SCRIPT_PATH not set.');
@@ -8,32 +9,16 @@ if (!CDC_APP_SCRIPT_PATH) console.error('[MCP Tool: purgeDatabase] ERROR: CDC_AP
 module.exports = {
   name: 'purgeDatabase',
   description: 'Triggers the "purge-data --confirm" command in the ClickUp Data Collector application. This will delete all data from the CDC database!',
-  inputSchema: {
-    type: 'object',
-    properties: {
-        confirm: {
-            type: 'boolean',
-            description: 'Must be set to true to confirm data purge. This is a destructive operation.',
-            enum: [true] // Wymusza, aby klient MCP wysłał `true`
-        }
-    },
-    required: ['confirm']
-  },
+  inputSchema: z.object({
+    confirm: z.literal(true)
+      .describe('Must be set to true to confirm data purge. This is a destructive operation.'),
+  }),
   handler: async (args) => {
-    const safeArgs = args || {};
-    const { confirm } = safeArgs;
-    console.error(`[MCP Tool: purgeDatabase] Received request with args: ${JSON.stringify(safeArgs)}`);
+    const { confirm } = args;
+    console.error(`[MCP Tool: purgeDatabase] Received validated request with args: ${JSON.stringify(args)}`);
 
     if (!CDC_APP_SCRIPT_PATH) { /* ... obsługa błędu braku ścieżki ... */ }
     
-    if (confirm !== true) {
-        // To narzędzie wymaga jawnego potwierdzenia przez LLM/klienta.
-        return {
-            isError: false, // Nie jest to błąd wykonania, tylko informacja/wymóg
-            content: [{ type: 'text', text: 'Data purge operation for CDC requires explicit confirmation by setting the "confirm" argument to true.' }],
-        };
-    }
-
     const commandName = "purge-data";
     // Flaga --confirm jest dodawana na stałe, ponieważ schemat wejściowy narzędzia MCP już ją wymusza
     const cliCommand = `node "${path.basename(CDC_APP_SCRIPT_PATH)}" ${commandName} --confirm`; 

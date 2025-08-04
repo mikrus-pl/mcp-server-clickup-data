@@ -12,10 +12,10 @@
   "description": "",
   "dependencies": {
     "@modelcontextprotocol/inspector": "^0.16.2",
-    "@modelcontextprotocol/sdk": "^1.11.1",
+    "@modelcontextprotocol/sdk": "^1.17.1",
     "dotenv": "^16.5.0",
     "knex": "^3.1.0",
     "sqlite3": "^5.1.7",
-    "zod": "^3.25.76"
+    "zod": "^4.0.14"
   }
 }

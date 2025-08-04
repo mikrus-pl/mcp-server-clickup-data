@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { exec } = require('child_process');
 const path = require('path');
+const { z } = require('zod');
 
 const CDC_APP_SCRIPT_PATH = process.env.CDC_APP_SCRIPT_PATH;
 if (!CDC_APP_SCRIPT_PATH) console.error('[MCP Tool: listUserHourlyRates] ERROR: CDC_APP_SCRIPT_PATH not set.');
@@ -8,29 +9,16 @@ if (!CDC_APP_SCRIPT_PATH) console.error('[MCP Tool: listUserHourlyRates] ERROR: 
 module.exports = {
   name: 'listUserHourlyRates',
   description: 'Lists all hourly rates for a specific user in the ClickUp Data Collector application. Returns all rates with their effective date ranges.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      userId: { 
-        type: 'integer',
-        description: 'The ClickUp User ID (numeric) for whom to list the rates.' 
-      }
-    },
-    required: ['userId'],
-  },
+  inputSchema: z.object({
+    userId: z.number().int()
+      .describe('The ClickUp User ID (numeric) for whom to list the rates.'),
+  }),
   handler: async (args) => {
-    const safeArgs = args || {};
-    const { userId } = safeArgs;
-    console.error(`[MCP Tool: listUserHourlyRates] Received request with args: ${JSON.stringify(safeArgs)}`);
+    const { userId } = args;
+    console.error(`[MCP Tool: listUserHourlyRates] Received validated request with args: ${JSON.stringify(args)}`);
 
     if (!CDC_APP_SCRIPT_PATH) {
       return { isError: true, content: [{ type: 'text', text: 'Server configuration error: CDC_APP_SCRIPT_PATH is not set.' }] };
-    }
-    if (userId === undefined) {
-        return { isError: true, content: [{ type: 'text', text: 'Error: userId argument is required.'}] };
-    }
-    if (typeof userId !== 'number') {
-        return { isError: true, content: [{ type: 'text', text: 'Invalid argument type. Ensure userId is an integer.' }] };
     }
 
     const commandName = "user-rate list";
