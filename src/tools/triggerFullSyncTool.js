@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { exec } = require('child_process');
 const path = require('path');
+const { z } = require('zod');
 // Dla full-sync możemy próbować parsować outputy poszczególnych kroków,
 // ale stdout może być bardzo długi i złożony. Na razie skupimy się na ogólnym statusie.
 // Jeśli chcemy szczegółowe dane, LLM powinien wywoływać poszczególne narzędzia synchronizacji.
@@ -8,26 +9,27 @@ const path = require('path');
 const CDC_APP_SCRIPT_PATH = process.env.CDC_APP_SCRIPT_PATH;
 if (!CDC_APP_SCRIPT_PATH) console.error('[MCP Tool: triggerFullSync] CRITICAL ERROR: CDC_APP_SCRIPT_PATH not set.');
 
+const inputSchema = z.object({});
+
 module.exports = {
   name: 'triggerFullSync',
   description: 'Triggers the "full-sync" command in the ClickUp Data Collector for a specific list ID. This performs user sync, full task sync, and aggregate generation.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      // Można dodać `archived`, jeśli komenda `full-sync` w CDC została dostosowana do przyjmowania tej flagi
-      // i przekazywania jej do kroku `sync-tasks`.
-      // archived: { 
-      //   type: 'boolean', 
-      //   description: 'Optional. Include archived tasks. Defaults to false.',
-      //   default: false 
-      // }
-    },
-    required: [],
-  },
+  inputSchema,
   // outputSchema: { /* ... */ },
   handler: async (args) => {
-    const safeArgs = args || {};
-    console.error(`[MCP Tool: triggerFullSync] Received request with args: ${JSON.stringify(safeArgs)}`);
+    // Validate args with Zod
+    const parsedArgs = inputSchema.safeParse(args);
+    if (!parsedArgs.success) {
+      return { 
+        isError: true, 
+        content: [{ 
+          type: 'text', 
+          text: `Invalid input: ${parsedArgs.error.issues[0].message}` 
+        }] 
+      };
+    }
+    
+    console.error(`[MCP Tool: triggerFullSync] Received request with args: ${JSON.stringify(parsedArgs.data)}`);
     
     // Load listId from environment variable
     const listId = process.env.CLICKUP_LIST_ID;

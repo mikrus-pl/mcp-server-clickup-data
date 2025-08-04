@@ -1,12 +1,10 @@
-const { db } = require('../db/database'); // Połączenie z bazą CDC (tylko do odczytu)
+const { db } = require('../db/database');
+const { z } = require('zod'); // Import Zod
 
 module.exports = {
   name: 'listUsers',
   description: 'Lists all users from the ClickUp data collector database with their most recent hourly rate.',
-  inputSchema: { // To narzędzie nie przyjmuje argumentów wejściowych
-    type: 'object',
-    properties: {},
-  },
+  inputSchema: z.object({}), // To narzędzie nie przyjmuje argumentów wejściowych
   handler: async (args) => { // args będzie pustym obiektem
     console.error('[MCP Tool: listUsers] Received request.');
     try {

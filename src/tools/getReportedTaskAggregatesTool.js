@@ -1,6 +1,7 @@
 const { db } = require('../db/database');
 const fs = require('fs');
 const path = require('path');
+const { z } = require('zod'); // Import Zod
 
 // Function to log to file
 function logToFile(message) {
@@ -19,29 +20,21 @@ function logToFile(message) {
 module.exports = {
   name: 'getReportedTaskAggregates',
   description: 'Retrieves aggregated task time report from the database. Allows filtering by client name, user ID, and month (Polish month names, e.g., "kwiecień", "lipiec").',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      clientName: { 
-        type: 'string', 
-        description: 'Filter by client name (exact match, case-insensitive for query). Optional.' 
-      },
-      userId: { 
-        type: 'integer', // ClickUp User ID
-        description: 'Filter by ClickUp User ID. Optional.' 
-      },
-      month: { 
-        type: 'string', 
-        description: 'Filter by month name in Polish (e.g., "kwiecień", "lipiec"). Case-insensitive. Optional.' 
-      },
-      limit: {
-        type: 'integer',
-        description: 'Limit the number of results (e.g., 100). Optional, defaults to a server-side limit if not provided.',
-        default: 1000 // Domyślny limit, jeśli klient nie poda
-      }
-    },
-    // required: [] // Na razie żadne pole nie jest wymagane
-  },
+  inputSchema: z.object({
+    clientName: z.string()
+      .describe('Filter by client name (exact match, case-insensitive for query). Optional.')
+      .optional(),
+    userId: z.number().int()
+      .describe('Filter by ClickUp User ID. Optional.')
+      .optional(),
+    month: z.string()
+      .describe('Filter by month name in Polish (e.g., "kwiecień", "lipiec"). Case-insensitive. Optional.')
+      .optional(),
+    limit: z.number().int()
+      .describe('Limit the number of results (e.g., 100). Optional, defaults to a server-side limit if not provided.')
+      .optional()
+      .default(1000),
+  }),
   handler: async (args) => {
     // Log raw arguments received
     logToFile(`RECEIVED ARGS: ${JSON.stringify(args)}`);

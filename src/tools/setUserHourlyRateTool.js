@@ -1,36 +1,28 @@
 require('dotenv').config();
 const { exec } = require('child_process');
 const path = require('path');
+const { z } = require('zod');
 
 const CDC_APP_SCRIPT_PATH = process.env.CDC_APP_SCRIPT_PATH;
 if (!CDC_APP_SCRIPT_PATH) console.error('[MCP Tool: setUserHourlyRate] ERROR: CDC_APP_SCRIPT_PATH not set.');
 
+const inputSchema = z.object({
+  userId: z.number('The ClickUp User ID (numeric) for whom to set the rate.'),
+  rate: z.number('The new hourly rate as a number (e.g., 30 or 30.50).'),
+  fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date from which the rate is effective, in YYYY-MM-DD format.'),
+});
+
 module.exports = {
   name: 'setUserHourlyRate',
   description: 'Sets a new hourly rate for a user in the ClickUp Data Collector application. Requires userId, rate, and fromDate (YYYY-MM-DD).',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      userId: { 
-        type: 'integer',
-        description: 'The ClickUp User ID (numeric) for whom to set the rate.' 
-      },
-      rate: { 
-        type: 'number', 
-        description: 'The new hourly rate as a number (e.g., 30 or 30.50).' 
-      },
-      fromDate: { 
-        type: 'string', 
-        pattern: '^\\d{4}-\\d{2}-\\d{2}$', 
-        description: 'Date from which the rate is effective, in YYYY-MM-DD format.' 
-      },
-    },
-    required: ['userId', 'rate', 'fromDate'],
-  },
+  inputSchema,
   handler: async (args) => {
-    const safeArgs = args || {};
-    const { userId, rate, fromDate } = safeArgs;
-    console.error(`[MCP Tool: setUserHourlyRate] Received request with args: ${JSON.stringify(safeArgs)}`);
+    const safeArgs = inputSchema.safeParse(args);
+    if (!safeArgs.success) {
+      return { isError: true, content: [{ type: 'text', text: `Invalid input: ${safeArgs.error.issues[0].message}` }] };
+    }
+    const { userId, rate, fromDate } = safeArgs.data;
+    console.error(`[MCP Tool: setUserHourlyRate] Received request with args: ${JSON.stringify(safeArgs.data)}`);
 
     if (!CDC_APP_SCRIPT_PATH) {
       return { isError: true, content: [{ type: 'text', text: 'Server configuration error: CDC_APP_SCRIPT_PATH is not set.' }] };
