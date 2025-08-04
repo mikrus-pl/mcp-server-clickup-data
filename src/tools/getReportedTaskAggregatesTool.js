@@ -1,7 +1,8 @@
 const { db } = require('../db/database');
 const fs = require('fs');
 const path = require('path');
-const { z } = require('zod'); // Import Zod
+const { z } = require('zod');
+const { zodToJsonSchema } = require('zod-to-json-schema'); // Import Zod
 
 // Function to log to file
 function logToFile(message) {
@@ -17,8 +18,8 @@ function logToFile(message) {
   fs.appendFileSync(logFilePath, logMessage);
 }
 
-// Proper Zod schema with updated MCP SDK and Zod versions
-const inputSchema = z.object({
+// Zod schema definition
+const zodSchema = z.object({
   clientName: z.string()
     .describe('Filter by client name (exact match, case-insensitive for query). Optional.')
     .optional(),
@@ -34,20 +35,37 @@ const inputSchema = z.object({
     .default(1000),
 });
 
+// Convert Zod schema to JSON Schema
+const rawJsonSchema = zodToJsonSchema(zodSchema, {
+  name: 'getReportedTaskAggregatesInput',
+  $refStrategy: 'none', // Avoid $ref usage for simpler schema
+});
+
+// Extract the actual schema from definitions to avoid $ref
+const inputSchema = rawJsonSchema.definitions 
+  ? rawJsonSchema.definitions.getReportedTaskAggregatesInput 
+  : rawJsonSchema;
+
+// Debug: Log the converted JSON Schema
+console.error('DEBUG - Converted JSON Schema:', JSON.stringify(inputSchema, null, 2));
+
 module.exports = {
   name: 'getReportedTaskAggregates',
   description: 'Retrieves aggregated task time report from the database. Allows filtering by client name, user ID, and month (Polish month names, e.g., "kwiecień", "lipiec").',
   inputSchema,
   handler: async (args) => {
+    // Validate args using Zod for runtime validation
+    const validatedArgs = zodSchema.parse(args);
+    
     // Log raw arguments received
     logToFile(`RECEIVED ARGS: ${JSON.stringify(args)}`);
     console.error(`[MCP Tool: getReportedTaskAggregates] Received request with filters:`, args);
     
     // Extract parameters with detailed logging
-    const clientName = args.clientName || null;
-    const userId = args.userId || null;
-    const month = args.month || null;
-    const limit = args.limit ? Math.min(args.limit, 5000) : 1000;
+    const clientName = validatedArgs.clientName || null;
+    const userId = validatedArgs.userId || null;
+    const month = validatedArgs.month || null;
+    const limit = validatedArgs.limit ? Math.min(validatedArgs.limit, 5000) : 1000;
     
     // Log extracted parameters
     logToFile(`EXTRACTED PARAMS - clientName: ${clientName}, userId: ${userId}, month: ${month}, limit: ${limit}`);

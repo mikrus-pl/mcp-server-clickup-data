@@ -5,19 +5,32 @@ const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
 const { z } = require('zod');
 
-const toolsToRegister = [
-  require('./src/tools/listUsersTool'),
-  require('./src/tools/getReportedTaskAggregatesTool'),
-  require('./src/tools/triggerUserSyncTool'),
-  require('./src/tools/triggerTaskSyncTool'),
-  require('./src/tools/triggerFullSyncTool'),
-  require('./src/tools/purgeDatabaseTool'),
-  require('./src/tools/setUserHourlyRateTool'),
-  require('./src/tools/listUserHourlyRatesTool'),
-  require('./src/tools/deactivateUserHourlyRateTool'),
-  require('./src/tools/createInvoiceTool'),
-  require('./src/tools/listInvoicesTool'),
+// Load tools with error handling
+const toolsToRegister = [];
+const toolPaths = [
+  './src/tools/listUsersTool',
+  './src/tools/getReportedTaskAggregatesTool',
+  './src/tools/triggerUserSyncTool',
+  './src/tools/triggerTaskSyncTool',
+  './src/tools/triggerFullSyncTool',
+  './src/tools/purgeDatabaseTool',
+  './src/tools/setUserHourlyRateTool',
+  './src/tools/listUserHourlyRatesTool',
+  './src/tools/deactivateUserHourlyRateTool',
+  './src/tools/createInvoiceTool',
+  './src/tools/listInvoicesTool',
 ];
+
+for (const toolPath of toolPaths) {
+  try {
+    const tool = require(toolPath);
+    toolsToRegister.push(tool);
+    console.error(`[MCP Server] Successfully loaded tool: ${tool.name || 'unknown'}`);
+  } catch (error) {
+    console.error(`[MCP Server] ERROR loading tool ${toolPath}:`, error.message);
+    console.error(`[MCP Server] Stack trace:`, error.stack);
+  }
+}
 
 const SERVER_NAME = process.env.MCP_SERVER_NAME || 'ClickUpDataServer';
 const SERVER_VERSION = process.env.MCP_SERVER_VERSION || '0.1.0';
@@ -37,10 +50,23 @@ async function main() {
     
     for (const tool of toolsToRegister) {
       console.error(`- Registering tool: ${tool.name}`);
+      
+      // Debug: sprawdź strukturę inputSchema
+      console.error(`  Schema type: ${typeof tool.inputSchema}`);
+      console.error(`  Schema content: ${JSON.stringify(tool.inputSchema, null, 2)}`);
+      
+      // Sprawdź czy to jest obiekt Zod
+      if (tool.inputSchema && tool.inputSchema._def) {
+        console.error(`  WARNING: This appears to be a Zod object, not JSON Schema!`);
+        console.error(`  Zod _def: ${JSON.stringify(tool.inputSchema._def, null, 2)}`);
+      }
 
       // Basic validation to ensure the tool module is correctly structured
-      if (!tool.name || !tool.description || !(tool.inputSchema instanceof z.ZodObject) || !tool.handler) {
-        console.error(`[MCP Server] CRITICAL: Tool module for '${tool.name || 'unknown'}' is malformed. It must export name, description, a ZodObject for inputSchema, and a handler. Skipping.`);
+      const hasValidSchema = (tool.inputSchema instanceof z.ZodObject) || 
+                            (typeof tool.inputSchema === 'object' && tool.inputSchema !== null);
+      
+      if (!tool.name || !tool.description || !hasValidSchema || !tool.handler) {
+        console.error(`[MCP Server] CRITICAL: Tool module for '${tool.name || 'unknown'}' is malformed. It must export name, description, a schema (Zod or JSON Schema), and a handler. Skipping.`);
         continue;
       }
       
