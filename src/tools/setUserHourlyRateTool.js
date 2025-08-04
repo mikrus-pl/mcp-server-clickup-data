@@ -1,7 +1,6 @@
 require('dotenv').config();
 const { exec } = require('child_process');
 const path = require('path');
-const { z } = require('zod');
 
 const CDC_APP_SCRIPT_PATH = process.env.CDC_APP_SCRIPT_PATH;
 if (!CDC_APP_SCRIPT_PATH) console.error('[MCP Tool: setUserHourlyRate] ERROR: CDC_APP_SCRIPT_PATH not set.');
@@ -9,16 +8,57 @@ if (!CDC_APP_SCRIPT_PATH) console.error('[MCP Tool: setUserHourlyRate] ERROR: CD
 module.exports = {
   name: 'setUserHourlyRate',
   description: 'Sets a new hourly rate for a user in the ClickUp Data Collector application. Requires userId, rate, and fromDate (YYYY-MM-DD).',
-  inputSchema: z.object({
-    userId: z.number().int()
-      .describe('The ClickUp User ID (numeric) for whom to set the rate.'),
-    rate: z.number()
-      .describe('The new hourly rate as a number (e.g., 30 or 30.50).'),
-    fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
-      .describe('Date from which the rate is effective, in YYYY-MM-DD format.'),
-  }),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      userId: {
+        type: 'integer',
+        description: 'The ClickUp User ID (numeric) for whom to set the rate.'
+      },
+      rate: {
+        type: 'number',
+        description: 'The new hourly rate as a number (e.g., 30 or 30.50).'
+      },
+      fromDate: {
+        type: 'string',
+        description: 'Date from which the rate is effective, in YYYY-MM-DD format.',
+        pattern: '^\d{4}-\d{2}-\d{2}$'
+      }
+    },
+    required: ['userId', 'rate', 'fromDate']
+  },
   handler: async (args) => {
+    // Manual validation since we're not using Zod anymore
+    if (!args || typeof args !== 'object') {
+      return { 
+        isError: true, 
+        content: [{ type: 'text', text: 'Invalid input: args must be an object' }] 
+      };
+    }
+    
     const { userId, rate, fromDate } = args;
+    
+    // Validate required fields
+    if (typeof userId !== 'number' || !Number.isInteger(userId)) {
+      return { 
+        isError: true, 
+        content: [{ type: 'text', text: 'Invalid input: userId must be an integer' }] 
+      };
+    }
+    
+    if (typeof rate !== 'number' || isNaN(rate)) {
+      return { 
+        isError: true, 
+        content: [{ type: 'text', text: 'Invalid input: rate must be a number' }] 
+      };
+    }
+    
+    if (typeof fromDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(fromDate)) {
+      return { 
+        isError: true, 
+        content: [{ type: 'text', text: 'Invalid input: fromDate must be in YYYY-MM-DD format' }] 
+      };
+    }
     console.error(`[MCP Tool: setUserHourlyRate] Received validated request with args: ${JSON.stringify(args)}`);
 
     if (!CDC_APP_SCRIPT_PATH) {

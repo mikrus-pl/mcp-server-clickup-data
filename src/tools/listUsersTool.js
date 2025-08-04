@@ -1,13 +1,30 @@
 const { db } = require('../db/database');
-const { z } = require('zod'); // Import Zod
 
 module.exports = {
   name: 'listUsers',
   description: 'Lists all users from the ClickUp data collector database with their most recent hourly rate.',
-  inputSchema: z.object({}), // To narzędzie nie przyjmuje argumentów wejściowych
-  handler: async (args) => { // args będzie pustym obiektem
+  inputSchema: {
+    type: 'object',
+    properties: {
+      detailed: {
+        type: 'boolean',
+        description: 'If true, returns detailed user information. If false, returns only user IDs and names.',
+        default: true
+      }
+    },
+    required: []
+  },
+  handler: async (args) => { 
     console.error('[MCP Tool: listUsers] Received request.');
     try {
+      // Validate arguments manually
+      if (typeof args !== 'object' || args === null) {
+        throw new Error('Invalid input: expected an object');
+      }
+      if ('detailed' in args && typeof args.detailed !== 'boolean') {
+        throw new Error('Invalid input: "detailed" must be a boolean');
+      }
+
       // Zapytanie do bazy: pobierz użytkowników i dołącz ich najnowszą stawkę
       // To zapytanie może być skomplikowane, aby wybrać tylko najnowszą stawkę.
       // Możemy to zrobić przez podzapytanie lub `ROW_NUMBER()` jeśli SQLite to wspiera dobrze z Knex.

@@ -4,8 +4,6 @@ require('dotenv').config();
 const { exec } = require('child_process');
 // Importuj moduł 'path' do manipulacji ścieżkami plików
 const path = require('path');
-// Importuj Zod do walidacji schematów
-const { z } = require('zod');
 // Importuj naszą funkcję do parsowania outputu komendy sync-users z CDC
 const { parseSyncUsersOutput } = require('../utils/cdcOutputParser'); 
 
@@ -22,8 +20,12 @@ module.exports = {
   name: 'triggerUserSync',
   // Opis narzędzia, który będzie widoczny dla LLM i klienta MCP
   description: 'Triggers the "sync-users" command in the ClickUp Data Collector application. This synchronizes user data from ClickUp with the local database.',
-  // Schemat Zod definiujący oczekiwane argumenty wejściowe dla tego narzędzia
-  inputSchema: z.object({}), // Pusty obiekt, ponieważ to narzędzie nie przyjmuje żadnych argumentów od klienta MCP
+  // Schemat JSON definiujący oczekiwane argumenty wejściowe dla tego narzędzia
+  inputSchema: {
+    type: 'object',
+    properties: {},
+    required: []
+  },
   // outputSchema: { ... } // Można zdefiniować, jeśli chcemy zwracać structuredContent (opcjonalne dla MVP)
 
   // Asynchroniczna funkcja (handler), która zostanie wykonana, gdy LLM wywoła to narzędzie

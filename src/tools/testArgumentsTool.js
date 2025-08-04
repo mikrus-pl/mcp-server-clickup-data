@@ -1,24 +1,54 @@
 // src/tools/testArgumentsTool.js
-const { z } = require('zod');
 
 module.exports = {
     name: 'testArguments',
     description: 'A simple tool to test argument passing from MCP Inspector. Accepts a string and a boolean.',
-    inputSchema: z.object({
-      testString: z.string()
-        .describe('A test string input.')
-        .refine(val => !!val, 'testString is required'),
-      testBoolean: z.boolean()
-        .describe('A test boolean input.')
-        .optional(),
-    }),
+    inputSchema: {
+    type: 'object',
+    properties: {
+      testString: {
+        type: 'string',
+        description: 'A test string input.'
+      },
+      testBoolean: {
+        type: 'boolean',
+        description: 'A test boolean input.'
+      }
+    },
+    required: ['testString']
+  },
     handler: async (args) => {
       const safeArgs = args || {};
       console.error(`[MCP Tool: testArguments] Received arguments:`, JSON.stringify(safeArgs));
-  
-      try {
-        const parsedArgs = this.inputSchema.parse(safeArgs);
-        const { testString: parsedTestString, testBoolean: parsedTestBoolean } = parsedArgs;
+      
+      // Manual validation since we're not using Zod anymore
+      if (!args || typeof args !== 'object') {
+        return { 
+          isError: true, 
+          content: [{ type: 'text', text: 'Invalid input: args must be an object' }] 
+        };
+      }
+      
+      const { testString, testBoolean } = safeArgs;
+      
+      // Validate required field
+      if (typeof testString !== 'string' || testString === '') {
+        return { 
+          isError: true, 
+          content: [{ type: 'text', text: 'Invalid input: testString is required and must be a non-empty string' }] 
+        };
+      }
+      
+      // Validate optional field
+      if (testBoolean !== undefined && typeof testBoolean !== 'boolean') {
+        return { 
+          isError: true, 
+          content: [{ type: 'text', text: 'Invalid input: testBoolean must be a boolean' }] 
+        };
+      }
+      
+      const parsedTestString = testString;
+      const parsedTestBoolean = testBoolean;
   
         const responseText = `Received testString: "${parsedTestString}", testBoolean: ${parsedTestBoolean === undefined ? '(not provided)' : parsedTestBoolean}.`;
         

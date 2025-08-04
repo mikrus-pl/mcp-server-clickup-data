@@ -3,10 +3,8 @@
 require('dotenv').config();
 const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
-const { z } = require('zod');
 
-// Load tools with error handling
-const toolsToRegister = [];
+// Tool paths to load
 const toolPaths = [
   './src/tools/listUsersTool',
   './src/tools/getReportedTaskAggregatesTool',
@@ -21,22 +19,66 @@ const toolPaths = [
   './src/tools/listInvoicesTool',
 ];
 
-for (const toolPath of toolPaths) {
-  try {
-    const tool = require(toolPath);
-    toolsToRegister.push(tool);
-    console.error(`[MCP Server] Successfully loaded tool: ${tool.name || 'unknown'}`);
-  } catch (error) {
-    console.error(`[MCP Server] ERROR loading tool ${toolPath}:`, error.message);
-    console.error(`[MCP Server] Stack trace:`, error.stack);
-  }
-}
-
 const SERVER_NAME = process.env.MCP_SERVER_NAME || 'ClickUpDataServer';
 const SERVER_VERSION = process.env.MCP_SERVER_VERSION || '0.1.0';
 
+// Helper function to validate JSON Schema
+function validateJsonSchema(schema, toolName) {
+  // Check if it's a Zod object (not allowed)
+  if (schema && schema._def) {
+    console.error(`  ✗ ERROR: Tool '${toolName}' uses Zod object instead of JSON Schema!`);
+    console.error(`    Zod objects are not supported by MCP SDK.`);
+    console.error(`    Please convert to JSON Schema format.`);
+    return false;
+  }
+  
+  // Check basic structure
+  if (!schema || typeof schema !== 'object') {
+    console.error(`  ✗ ERROR: Schema is not an object`);
+    return false;
+  }
+  
+  // Check for required 'type' property
+  if (!schema.type) {
+    console.error(`  ⚠ WARNING: Schema missing 'type' property`);
+  }
+  
+  // For object schemas, check properties
+  if (schema.type === 'object') {
+    if (!schema.properties) {
+      console.error(`  ⚠ WARNING: Object schema missing 'properties'`);
+    } else {
+      const propCount = Object.keys(schema.properties).length;
+      console.error(`  ✓ Schema has ${propCount} properties defined`);
+      
+      // List properties with their types
+      for (const [propName, propDef] of Object.entries(schema.properties)) {
+        const propType = propDef.type || 'unknown';
+        const isRequired = schema.required && schema.required.includes(propName);
+        const optionalText = isRequired ? 'required' : 'optional';
+        console.error(`    - ${propName}: ${propType} (${optionalText})`);
+        if (propDef.description) {
+          console.error(`      Description: ${propDef.description}`);
+        }
+        if (propDef.default !== undefined) {
+          console.error(`      Default: ${propDef.default}`);
+        }
+      }
+    }
+    
+    // Check for additionalProperties
+    if (schema.additionalProperties !== false) {
+      console.error(`  ⚠ WARNING: Consider setting additionalProperties: false`);
+    }
+  }
+  
+  return true;
+}
+
 async function main() {
   console.error(`[MCP Server] Initializing server: ${SERVER_NAME} v${SERVER_VERSION}`);
+  console.error(`[MCP Server] =================================================`);
+  
   const server = new McpServer({
     name: SERVER_NAME,
     version: SERVER_VERSION,
@@ -46,61 +88,89 @@ async function main() {
   });
 
   try {
-    console.error('[MCP Server] Registering tools...');
+    // Load tools with error handling
+    console.error('[MCP Server] Loading tools...');
+    const toolsToRegister = [];
+    
+    for (const toolPath of toolPaths) {
+      try {
+        const tool = require(toolPath);
+        toolsToRegister.push(tool);
+        console.error(`[MCP Server] ✓ Successfully loaded: ${tool.name || 'unknown'}`);
+      } catch (error) {
+        console.error(`[MCP Server] ✗ ERROR loading ${toolPath}:`, error.message);
+      }
+    }
+    
+    console.error(`[MCP Server] =================================================`);
+    console.error('[MCP Server] Registering tools with server...');
+    
+    let successCount = 0;
+    let failCount = 0;
     
     for (const tool of toolsToRegister) {
-      console.error(`- Registering tool: ${tool.name}`);
+      console.error(`\n[MCP Server] Processing tool: ${tool.name}`);
+      console.error(`  Description: ${tool.description?.substring(0, 80)}...`);
       
-      // Debug: sprawdź strukturę inputSchema
-      console.error(`  Schema type: ${typeof tool.inputSchema}`);
-      console.error(`  Schema content: ${JSON.stringify(tool.inputSchema, null, 2)}`);
-      
-      // Sprawdź czy to jest obiekt Zod
-      if (tool.inputSchema && tool.inputSchema._def) {
-        console.error(`  WARNING: This appears to be a Zod object, not JSON Schema!`);
-        console.error(`  Zod _def: ${JSON.stringify(tool.inputSchema._def, null, 2)}`);
-      }
-
-      // Basic validation to ensure the tool module is correctly structured
-      const hasValidSchema = (tool.inputSchema instanceof z.ZodObject) || 
-                            (typeof tool.inputSchema === 'object' && tool.inputSchema !== null);
-      
-      if (!tool.name || !tool.description || !hasValidSchema || !tool.handler) {
-        console.error(`[MCP Server] CRITICAL: Tool module for '${tool.name || 'unknown'}' is malformed. It must export name, description, a schema (Zod or JSON Schema), and a handler. Skipping.`);
+      // Validate tool structure
+      if (!tool.name || !tool.description || !tool.inputSchema || !tool.handler) {
+        console.error(`  ✗ ERROR: Tool is missing required properties`);
+        console.error(`    Required: name, description, inputSchema, handler`);
+        console.error(`    Found: ${Object.keys(tool).join(', ')}`);
+        failCount++;
         continue;
       }
       
-      // *** THIS IS THE CRITICAL FIX ***
-      // Use the correct method signature: tool(name, description, schema, handler)
-      server.tool(
-        tool.name,
-        tool.description,
-        tool.inputSchema,
-        tool.handler
-      );
+      // Validate input schema
+      console.error(`  Validating schema...`);
+      if (!validateJsonSchema(tool.inputSchema, tool.name)) {
+        console.error(`  ✗ ERROR: Invalid schema, skipping tool`);
+        failCount++;
+        continue;
+      }
+      
+      // Try to register the tool
+      try {
+        server.tool(
+          tool.name,
+          tool.description,
+          tool.inputSchema,
+          tool.handler
+        );
+        console.error(`  ✓ Tool registered successfully!`);
+        successCount++;
+      } catch (error) {
+        console.error(`  ✗ ERROR registering tool: ${error.message}`);
+        failCount++;
+      }
     }
     
-    console.error('[MCP Server] All tools registered successfully.');
+    console.error(`\n[MCP Server] =================================================`);
+    console.error(`[MCP Server] Registration complete:`);
+    console.error(`[MCP Server]   ✓ Successful: ${successCount} tools`);
+    console.error(`[MCP Server]   ✗ Failed: ${failCount} tools`);
+    console.error(`[MCP Server] =================================================`);
+
+    if (successCount === 0) {
+      throw new Error('No tools were successfully registered!');
+    }
 
   } catch (regError) {
     console.error('[MCP Server] CRITICAL: Error during tool registration:', regError);
     process.exit(1);
   }
   
-  // Handler dla `initialize` jest automatycznie obsługiwany przez McpServer.
-  // Handlery dla `tools/list` i `tools/call` SĄ AUTOMATYCZNIE generowane przez McpServer
-  // na podstawie narzędzi zarejestrowanych przez `server.tool()`.
-  // Dlatego NIE używamy już `server.setRequestHandler(...)` dla tych metod.
-  
+  // Connect transport
   const transport = new StdioServerTransport();
-  console.error('[MCP Server] Connecting transport...');
+  console.error('\n[MCP Server] Connecting transport...');
   await server.connect(transport);
 
-  console.error(`[MCP Server] ${SERVER_NAME} v${SERVER_VERSION} running and connected via stdio.`);
-  console.error('[MCP Server] Waiting for MCP client requests...');
+  console.error(`[MCP Server] ${SERVER_NAME} v${SERVER_VERSION} is running`);
+  console.error('[MCP Server] Ready to handle MCP client requests');
+  console.error('[MCP Server] =================================================\n');
 }
 
 main().catch((error) => {
-  console.error('[MCP Server] Fatal error during server startup or operation:', error);
+  console.error('[MCP Server] Fatal error during server startup:', error);
   process.exit(1);
 });

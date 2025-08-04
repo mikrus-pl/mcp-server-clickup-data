@@ -1,24 +1,58 @@
 const { db } = require('../db/database');
-const { z } = require('zod');
 
 module.exports = {
   name: 'listInvoices',
   description: 'Lists invoices from the database with various filtering options. Can filter by month, customer, or both. Returns detailed invoice information.',
-  inputSchema: z.object({
-    monthName: z.string()
-      .describe('Filter by month name to list all invoices for a selected month.')
-      .optional(),
-    customerName: z.string()
-      .describe('Filter by customer name to list all invoices for a selected customer.')
-      .optional(),
-    detailed: z.boolean()
-      .describe('If true, returns detailed invoice information. If false, returns aggregated values (count and total).')
-      .optional()
-      .default(true),
-  }),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      monthName: {
+        type: 'string',
+        description: 'Filter by month name to list all invoices for a selected month.'
+      },
+      customerName: {
+        type: 'string',
+        description: 'Filter by customer name to list all invoices for a selected customer.'
+      },
+      detailed: {
+        type: 'boolean',
+        description: 'If true, returns detailed invoice information. If false, returns aggregated values (count and total).',
+        default: true
+      }
+    },
+    required: []
+  },
   handler: async (args) => {
-    // The `detailed` argument will be `true` even if the client didn't send it.
-    const { monthName, customerName, detailed } = args;
+    // Manual validation since we're not using Zod anymore
+    if (!args || typeof args !== 'object') {
+      args = {};
+    }
+    
+    const { monthName, customerName } = args;
+    // Handle default value for detailed
+    const detailed = args.detailed !== undefined ? args.detailed : true;
+    
+    // Validate optional fields if provided
+    if (monthName !== undefined && typeof monthName !== 'string') {
+      return { 
+        isError: true, 
+        content: [{ type: 'text', text: 'Invalid input: monthName must be a string' }] 
+      };
+    }
+    
+    if (customerName !== undefined && typeof customerName !== 'string') {
+      return { 
+        isError: true, 
+        content: [{ type: 'text', text: 'Invalid input: customerName must be a string' }] 
+      };
+    }
+    
+    if (args.detailed !== undefined && typeof args.detailed !== 'boolean') {
+      return { 
+        isError: true, 
+        content: [{ type: 'text', text: 'Invalid input: detailed must be a boolean' }] 
+      };
+    }
     console.error(`[MCP Tool: listInvoices] Received request with args: ${JSON.stringify(args)}`);
 
     // No need for manual validation or setting defaults like `detailed = true`

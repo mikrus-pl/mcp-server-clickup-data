@@ -1,7 +1,6 @@
 require('dotenv').config();
 const { exec } = require('child_process');
 const path = require('path');
-const { z } = require('zod');
 // Importuj parser specyficzny dla outputu komendy sync-tasks
 const { parseSyncTasksOutput } = require('../utils/cdcOutputParser');
 
@@ -11,38 +10,58 @@ if (!CDC_APP_SCRIPT_PATH) {
   console.error('[MCP Tool: triggerTaskSync] CRITICAL ERROR: CDC_APP_SCRIPT_PATH is not set in .env for the MCP Server.');
 }
 
-const inputSchema = z.object({
-  fullSync: z.boolean()
-    .describe('Optional. Perform a full synchronization, ignoring the last sync timestamp. Defaults to false.')
-    .optional()
-    .default(false),
-  archived: z.boolean()
-    .describe('Optional. Include archived tasks in the synchronization. Defaults to false.')
-    .optional()
-    .default(false),
-});
-
 module.exports = {
   name: 'triggerTaskSync',
   description: 'Triggers the "sync-tasks" command in CDC for a specific list ID. Allows for full sync and including archived tasks.',
-  inputSchema,
+  inputSchema: {
+    type: 'object',
+    properties: {
+      fullSync: {
+        type: 'boolean',
+        description: 'Optional. Perform a full synchronization, ignoring the last sync timestamp. Defaults to false.',
+        default: false
+      },
+      archived: {
+        type: 'boolean',
+        description: 'Optional. Include archived tasks in the synchronization. Defaults to false.',
+        default: false
+      }
+    },
+    required: []
+  },
   // outputSchema: { /* ... można zdefiniować dla structuredContent ... */ },
   handler: async (args) => {
-    // Validate args with Zod
-    const parsedArgs = inputSchema.safeParse(args);
-    if (!parsedArgs.success) {
+    // Manual validation since we're not using Zod anymore
+    if (!args || typeof args !== 'object') {
+      args = {};
+    }
+    
+    // Handle default values
+    const fullSync = args.fullSync !== undefined ? args.fullSync : false;
+    const archived = args.archived !== undefined ? args.archived : false;
+    
+    // Validate optional fields if provided
+    if (args.fullSync !== undefined && typeof args.fullSync !== 'boolean') {
       return { 
         isError: true, 
         content: [{ 
           type: 'text', 
-          text: `Invalid input: ${parsedArgs.error.issues[0].message}` 
+          text: 'Invalid input: fullSync must be a boolean' 
         }] 
       };
     }
     
-    const { fullSync, archived } = parsedArgs.data;
+    if (args.archived !== undefined && typeof args.archived !== 'boolean') {
+      return { 
+        isError: true, 
+        content: [{ 
+          type: 'text', 
+          text: 'Invalid input: archived must be a boolean' 
+        }] 
+      };
+    }
     
-    console.error(`[MCP Tool: triggerTaskSync] DEBUG: Parsed args: ${JSON.stringify(parsedArgs.data)}`);
+    console.error(`[MCP Tool: triggerTaskSync] DEBUG: Parsed args: ${JSON.stringify({ fullSync, archived })}`);
     
     // Load listId from environment variable
     const listId = process.env.CLICKUP_LIST_ID;

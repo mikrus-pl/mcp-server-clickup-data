@@ -1,7 +1,6 @@
 require('dotenv').config();
 const { exec } = require('child_process');
 const path = require('path');
-const { z } = require('zod');
 
 const CDC_APP_SCRIPT_PATH = process.env.CDC_APP_SCRIPT_PATH;
 if (!CDC_APP_SCRIPT_PATH) console.error('[MCP Tool: purgeDatabase] ERROR: CDC_APP_SCRIPT_PATH not set.');
@@ -9,12 +8,35 @@ if (!CDC_APP_SCRIPT_PATH) console.error('[MCP Tool: purgeDatabase] ERROR: CDC_AP
 module.exports = {
   name: 'purgeDatabase',
   description: 'Triggers the "purge-data --confirm" command in the ClickUp Data Collector application. This will delete all data from the CDC database!',
-  inputSchema: z.object({
-    confirm: z.literal(true)
-      .describe('Must be set to true to confirm data purge. This is a destructive operation.'),
-  }),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      confirm: {
+        type: 'boolean',
+        description: 'Must be set to true to confirm data purge. This is a destructive operation.',
+        enum: [true]
+      }
+    },
+    required: ['confirm']
+  },
   handler: async (args) => {
+    // Manual validation since we're not using Zod anymore
+    if (!args || typeof args !== 'object') {
+      return { 
+        isError: true, 
+        content: [{ type: 'text', text: 'Invalid input: args must be an object' }] 
+      };
+    }
+    
     const { confirm } = args;
+    
+    // Validate required field
+    if (confirm !== true) {
+      return { 
+        isError: true, 
+        content: [{ type: 'text', text: 'Invalid input: confirm must be set to true to confirm data purge' }] 
+      };
+    }
     console.error(`[MCP Tool: purgeDatabase] Received validated request with args: ${JSON.stringify(args)}`);
 
     if (!CDC_APP_SCRIPT_PATH) { /* ... obsługa błędu braku ścieżki ... */ }

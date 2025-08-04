@@ -1,8 +1,6 @@
 const { db } = require('../db/database');
 const fs = require('fs');
 const path = require('path');
-const { z } = require('zod');
-const { zodToJsonSchema } = require('zod-to-json-schema'); // Import Zod
 
 // Function to log to file
 function logToFile(message) {
@@ -18,54 +16,87 @@ function logToFile(message) {
   fs.appendFileSync(logFilePath, logMessage);
 }
 
-// Zod schema definition
-const zodSchema = z.object({
-  clientName: z.string()
-    .describe('Filter by client name (exact match, case-insensitive for query). Optional.')
-    .optional(),
-  userId: z.number().int()
-    .describe('Filter by ClickUp User ID. Optional.')
-    .optional(),
-  month: z.string()
-    .describe('Filter by month name in Polish (e.g., "kwiecień", "lipiec"). Case-insensitive. Optional.')
-    .optional(),
-  limit: z.number().int()
-    .describe('Limit the number of results (e.g., 100). Optional, defaults to 1000 if not provided.')
-    .optional()
-    .default(1000),
-});
+// Ręcznie zdefiniowany JSON Schema dla MCP
+const inputSchema = {
+  type: 'object',
+  properties: {
+    clientName: {
+      type: 'string',
+      description: 'Filter by client name (exact match, case-insensitive for query). Optional.'
+    },
+    userId: {
+      type: 'integer',
+      description: 'Filter by ClickUp User ID. Optional.'
+    },
+    month: {
+      type: 'string',
+      description: 'Filter by month name in Polish (e.g., "kwiecień", "lipiec"). Case-insensitive. Optional.'
+    },
+    limit: {
+      type: 'integer',
+      description: 'Limit the number of results (e.g., 100). Optional, defaults to 1000 if not provided.',
+      default: 1000
+    }
+  },
+  additionalProperties: false
+  // Brak "required" array - wszystkie pola są opcjonalne
+};
 
-// Convert Zod schema to JSON Schema
-const rawJsonSchema = zodToJsonSchema(zodSchema, {
-  name: 'getReportedTaskAggregatesInput',
-  $refStrategy: 'none', // Avoid $ref usage for simpler schema
-});
-
-// Extract the actual schema from definitions to avoid $ref
-const inputSchema = rawJsonSchema.definitions 
-  ? rawJsonSchema.definitions.getReportedTaskAggregatesInput 
-  : rawJsonSchema;
-
-// Debug: Log the converted JSON Schema
-console.error('DEBUG - Converted JSON Schema:', JSON.stringify(inputSchema, null, 2));
+// Debug: Log the JSON Schema
+console.error('[DEBUG - getReportedTaskAggregates] JSON Schema:', JSON.stringify(inputSchema, null, 2));
 
 module.exports = {
   name: 'getReportedTaskAggregates',
   description: 'Retrieves aggregated task time report from the database. Allows filtering by client name, user ID, and month (Polish month names, e.g., "kwiecień", "lipiec").',
-  inputSchema,
+  inputSchema, // To jest czysty JSON Schema, nie obiekt Zod!
   handler: async (args) => {
-    // Validate args using Zod for runtime validation
-    const validatedArgs = zodSchema.parse(args);
+    // Manual validation since we're not using Zod anymore
+    if (!args || typeof args !== 'object') {
+      args = {};
+    }
+    
+    // Validate optional fields if provided
+    if (args.clientName !== undefined && typeof args.clientName !== 'string') {
+      return { 
+        isError: true, 
+        content: [{ type: 'text', text: 'Invalid input: clientName must be a string' }] 
+      };
+    }
+    
+    if (args.userId !== undefined && (typeof args.userId !== 'number' || !Number.isInteger(args.userId))) {
+      return { 
+        isError: true, 
+        content: [{ type: 'text', text: 'Invalid input: userId must be an integer' }] 
+      };
+    }
+    
+    if (args.month !== undefined && typeof args.month !== 'string') {
+      return { 
+        isError: true, 
+        content: [{ type: 'text', text: 'Invalid input: month must be a string' }] 
+      };
+    }
+    
+    if (args.limit !== undefined && (typeof args.limit !== 'number' || !Number.isInteger(args.limit))) {
+      return { 
+        isError: true, 
+        content: [{ type: 'text', text: 'Invalid input: limit must be an integer' }] 
+      };
+    }
+    
+    // Handle default value for limit
+    const limit = args.limit !== undefined ? Math.min(args.limit, 5000) : 1000;
+    
+    // Extract parameters
+    const clientName = args.clientName || null;
+    const userId = args.userId || null;
+    const month = args.month || null;
     
     // Log raw arguments received
     logToFile(`RECEIVED ARGS: ${JSON.stringify(args)}`);
     console.error(`[MCP Tool: getReportedTaskAggregates] Received request with filters:`, args);
     
-    // Extract parameters with detailed logging
-    const clientName = validatedArgs.clientName || null;
-    const userId = validatedArgs.userId || null;
-    const month = validatedArgs.month || null;
-    const limit = validatedArgs.limit ? Math.min(validatedArgs.limit, 5000) : 1000;
+
     
     // Log extracted parameters
     logToFile(`EXTRACTED PARAMS - clientName: ${clientName}, userId: ${userId}, month: ${month}, limit: ${limit}`);

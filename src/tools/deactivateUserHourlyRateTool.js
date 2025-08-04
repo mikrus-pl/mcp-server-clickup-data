@@ -1,7 +1,6 @@
 require('dotenv').config();
 const { exec } = require('child_process');
 const path = require('path');
-const { z } = require('zod');
 
 const CDC_APP_SCRIPT_PATH = process.env.CDC_APP_SCRIPT_PATH;
 if (!CDC_APP_SCRIPT_PATH) console.error('[MCP Tool: deactivateUserHourlyRate] ERROR: CDC_APP_SCRIPT_PATH not set.');
@@ -9,12 +8,34 @@ if (!CDC_APP_SCRIPT_PATH) console.error('[MCP Tool: deactivateUserHourlyRate] ER
 module.exports = {
   name: 'deactivateUserHourlyRate',
   description: 'Deactivates a specific hourly rate by setting its end date to yesterday in the ClickUp Data Collector application. Requires rateId.',
-  inputSchema: z.object({
-    rateId: z.number().int()
-      .describe('The Rate ID (numeric) to deactivate.'),
-  }),
+  inputSchema: {
+    type: 'object',
+    properties: {
+      rateId: {
+        type: 'integer',
+        description: 'The Rate ID (numeric) to deactivate.'
+      }
+    },
+    required: ['rateId']
+  },
   handler: async (args) => {
+    // Manual validation since we're not using Zod anymore
+    if (!args || typeof args !== 'object') {
+      return { 
+        isError: true, 
+        content: [{ type: 'text', text: 'Invalid input: args must be an object' }] 
+      };
+    }
+    
     const { rateId } = args;
+    
+    // Validate required field
+    if (typeof rateId !== 'number' || !Number.isInteger(rateId)) {
+      return { 
+        isError: true, 
+        content: [{ type: 'text', text: 'Invalid input: rateId must be an integer' }] 
+      };
+    }
     console.error(`[MCP Tool: deactivateUserHourlyRate] Received validated request with args: ${JSON.stringify(args)}`);
 
     if (!CDC_APP_SCRIPT_PATH) {

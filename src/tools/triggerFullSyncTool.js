@@ -1,7 +1,6 @@
 require('dotenv').config();
 const { exec } = require('child_process');
 const path = require('path');
-const { z } = require('zod');
 // Dla full-sync możemy próbować parsować outputy poszczególnych kroków,
 // ale stdout może być bardzo długi i złożony. Na razie skupimy się na ogólnym statusie.
 // Jeśli chcemy szczegółowe dane, LLM powinien wywoływać poszczególne narzędzia synchronizacji.
@@ -9,22 +8,23 @@ const { z } = require('zod');
 const CDC_APP_SCRIPT_PATH = process.env.CDC_APP_SCRIPT_PATH;
 if (!CDC_APP_SCRIPT_PATH) console.error('[MCP Tool: triggerFullSync] CRITICAL ERROR: CDC_APP_SCRIPT_PATH not set.');
 
-const inputSchema = z.object({});
-
 module.exports = {
   name: 'triggerFullSync',
   description: 'Triggers the "full-sync" command in the ClickUp Data Collector for a specific list ID. This performs user sync, full task sync, and aggregate generation.',
-  inputSchema,
+  inputSchema: {
+    type: 'object',
+    properties: {},
+    required: []
+  },
   // outputSchema: { /* ... */ },
   handler: async (args) => {
-    // Validate args with Zod
-    const parsedArgs = inputSchema.safeParse(args);
-    if (!parsedArgs.success) {
+    // Manual validation since we're not using Zod anymore
+    if (args && typeof args !== 'object') {
       return { 
         isError: true, 
         content: [{ 
           type: 'text', 
-          text: `Invalid input: ${parsedArgs.error.issues[0].message}` 
+          text: 'Invalid input: args must be an object' 
         }] 
       };
     }
