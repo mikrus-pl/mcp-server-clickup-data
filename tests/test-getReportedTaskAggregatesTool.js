@@ -1,5 +1,5 @@
 // Test script for getReportedTaskAggregatesTool
-// Usage: node test-getReportedTaskAggregatesTool.js [clientName]
+// Usage: node test-getReportedTaskAggregatesTool.js [--client <clientName>] [--user <userId>] [--month <monthName>] [--limit <limit>]
 
 const tool = require('../src/tools/getReportedTaskAggregatesTool');
 
@@ -12,8 +12,33 @@ async function testTool() {
   
   // Parse command line arguments
   const args = process.argv.slice(2);
-  if (args.length > 0) {
-    testArgs.clientName = args[0];
+  for (let i = 0; i < args.length; i++) {
+    switch (args[i]) {
+      case '--client':
+        if (i + 1 < args.length) {
+          testArgs.clientName = args[i + 1];
+          i++; // Skip the next argument
+        }
+        break;
+      case '--user':
+        if (i + 1 < args.length) {
+          testArgs.userId = parseInt(args[i + 1]);
+          i++; // Skip the next argument
+        }
+        break;
+      case '--month':
+        if (i + 1 < args.length) {
+          testArgs.month = args[i + 1];
+          i++; // Skip the next argument
+        }
+        break;
+      case '--limit':
+        if (i + 1 < args.length) {
+          testArgs.limit = parseInt(args[i + 1]);
+          i++; // Skip the next argument
+        }
+        break;
+    }
   }
   
   console.log('Input parameters:');

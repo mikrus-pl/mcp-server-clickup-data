@@ -66,43 +66,53 @@ async function main() {
   try {
     // Narzędzia do odczytu danych
     console.error('[MCP Server] Registering tool: listUsers');
+    // Merge description into inputSchema as required by MCP SDK
+    const listUsersSchema = { ...listUsersTool.inputSchema, description: listUsersTool.description };
     server.tool(
       listUsersTool.name,
-      listUsersTool.inputSchema, // Przekazujemy JSON Schema
+      listUsersSchema,
       listUsersTool.handler
     );
-    console.error(`  - Description for listUsers: ${listUsersTool.description}`); // Logujemy opis dla naszej wiedzy
+    console.error(`  - Description for listUsers: ${listUsersTool.description}`);
 
     console.error('[MCP Server] Registering tool: getReportedTaskAggregates');
+    // Merge description into inputSchema as required by MCP SDK
+    const getReportedTaskAggregatesSchema = { ...getReportedTaskAggregatesTool.inputSchema, description: getReportedTaskAggregatesTool.description };
     server.tool(
       getReportedTaskAggregatesTool.name,
-      getReportedTaskAggregatesTool.inputSchema,
+      getReportedTaskAggregatesSchema,
       getReportedTaskAggregatesTool.handler
     );
     console.error(`  - Description for getReportedTaskAggregates: ${getReportedTaskAggregatesTool.description}`);
 
     // Narzędzia do wywoływania komend CDC
     console.error('[MCP Server] Registering tool: triggerUserSync');
+    // Merge description into inputSchema as required by MCP SDK
+    const triggerUserSyncSchema = { ...triggerUserSyncTool.inputSchema, description: triggerUserSyncTool.description };
     server.tool(
       triggerUserSyncTool.name,
-      triggerUserSyncTool.inputSchema,
+      triggerUserSyncSchema,
       triggerUserSyncTool.handler
     );
     console.error(`  - Description for triggerUserSync: ${triggerUserSyncTool.description}`);
 
     console.error('[MCP Server] Registering tool: triggerTaskSync');
+    // Merge description into inputSchema as required by MCP SDK
+    const triggerTaskSyncSchema = { ...triggerTaskSyncTool.inputSchema, description: triggerTaskSyncTool.description };
     server.tool(
       triggerTaskSyncTool.name,
-      triggerTaskSyncTool.inputSchema,
+      triggerTaskSyncSchema,
       triggerTaskSyncTool.handler
     );
     console.error(`  - Description for triggerTaskSync: ${triggerTaskSyncTool.description}`);
     
     // if (triggerAggregateGenerationTool) { // Upewnij się, że plik istnieje i jest poprawnie zaimportowany
     //     console.error('[MCP Server] Registering tool: triggerAggregateGeneration');
+    //     // Merge description into inputSchema as required by MCP SDK
+    //     const triggerAggregateGenerationSchema = { ...triggerAggregateGenerationTool.inputSchema, description: triggerAggregateGenerationTool.description };
     //     server.tool(
     //         triggerAggregateGenerationTool.name,
-    //         triggerAggregateGenerationTool.inputSchema,
+    //         triggerAggregateGenerationSchema,
     //         triggerAggregateGenerationTool.handler
     //     );
     //     console.error(`  - Description for triggerAggregateGeneration: ${triggerAggregateGenerationTool.description}`);
@@ -111,58 +121,72 @@ async function main() {
     // }
 
     console.error('[MCP Server] Registering tool: triggerFullSync');
+    // Merge description into inputSchema as required by MCP SDK
+    const triggerFullSyncSchema = { ...triggerFullSyncTool.inputSchema, description: triggerFullSyncTool.description };
     server.tool(
       triggerFullSyncTool.name,
-      triggerFullSyncTool.inputSchema,
+      triggerFullSyncSchema,
       triggerFullSyncTool.handler
     );
     console.error(`  - Description for triggerFullSync: ${triggerFullSyncTool.description}`);
     
     console.error('[MCP Server] Registering tool: purgeDatabase');
+    // Merge description into inputSchema as required by MCP SDK
+    const purgeDatabaseSchema = { ...purgeDatabaseTool.inputSchema, description: purgeDatabaseTool.description };
     server.tool(
       purgeDatabaseTool.name,
-      purgeDatabaseTool.inputSchema,
+      purgeDatabaseSchema,
       purgeDatabaseTool.handler
     );
     console.error(`  - Description for purgeDatabase: ${purgeDatabaseTool.description}`);
 
     console.error('[MCP Server] Registering tool: setUserHourlyRate');
+    // Merge description into inputSchema as required by MCP SDK
+    const setUserHourlyRateSchema = { ...setUserHourlyRateTool.inputSchema, description: setUserHourlyRateTool.description };
     server.tool(
       setUserHourlyRateTool.name,
-      setUserHourlyRateTool.inputSchema,
+      setUserHourlyRateSchema,
       setUserHourlyRateTool.handler
     );
     console.error(`  - Description for setUserHourlyRate: ${setUserHourlyRateTool.description}`);
 
     console.error('[MCP Server] Registering tool: listUserHourlyRates');
+    // Merge description into inputSchema as required by MCP SDK
+    const listUserHourlyRatesSchema = { ...listUserHourlyRatesTool.inputSchema, description: listUserHourlyRatesTool.description };
     server.tool(
       listUserHourlyRatesTool.name,
-      listUserHourlyRatesTool.inputSchema,
+      listUserHourlyRatesSchema,
       listUserHourlyRatesTool.handler
     );
     console.error(`  - Description for listUserHourlyRates: ${listUserHourlyRatesTool.description}`);
 
     console.error('[MCP Server] Registering tool: deactivateUserHourlyRate');
+    // Merge description into inputSchema as required by MCP SDK
+    const deactivateUserHourlyRateSchema = { ...deactivateUserHourlyRateTool.inputSchema, description: deactivateUserHourlyRateTool.description };
     server.tool(
       deactivateUserHourlyRateTool.name,
-      deactivateUserHourlyRateTool.inputSchema,
+      deactivateUserHourlyRateSchema,
       deactivateUserHourlyRateTool.handler
     );
     console.error(`  - Description for deactivateUserHourlyRate: ${deactivateUserHourlyRateTool.description}`);
 
     // Register new invoice tools
     console.error('[MCP Server] Registering tool: createInvoice');
+    // Merge description into inputSchema as required by MCP SDK
+    const createInvoiceSchema = { ...createInvoiceTool.inputSchema, description: createInvoiceTool.description };
     server.tool(
       createInvoiceTool.name,
-      createInvoiceTool.inputSchema,
+      createInvoiceSchema,
       createInvoiceTool.handler
     );
     console.error(`  - Description for createInvoice: ${createInvoiceTool.description}`);
 
     console.error('[MCP Server] Registering tool: listInvoices');
+    // Merge description into inputSchema as required by MCP SDK
+    const listInvoicesSchema = { ...listInvoicesTool.inputSchema, description: listInvoicesTool.description };
     server.tool(
       listInvoicesTool.name,
-      listInvoicesTool.inputSchema,
+      listInvoicesSchema,
       listInvoicesTool.handler
     );
     console.error(`  - Description for listInvoices: ${listInvoicesTool.description}`);

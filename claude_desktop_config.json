@@ -9,7 +9,8 @@
           "CDC_DATABASE_PATH": "C:/Moko_apps/clickup-data-collector/data/app_data.sqlite3",
           "CDC_APP_SCRIPT_PATH": "C:/Moko_apps/clickup-data-collector/app.js",
           "MCP_SERVER_NAME": "ClickUpDataServerMoko",
-          "MCP_SERVER_VERSION": "0.1.0"
+          "MCP_SERVER_VERSION": "0.1.0",
+          "CLICKUP_LIST_ID": "901206975324"
         }
       }
     }
