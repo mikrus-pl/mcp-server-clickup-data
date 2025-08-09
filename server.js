@@ -7,7 +7,6 @@ const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio
 // Tool paths to load
 const toolPaths = [
   './src/tools/listUsersTool',
-  './src/tools/getReportedTaskAggregatesTool',
   './src/tools/triggerUserSyncTool',
   './src/tools/triggerTaskSyncTool',
   './src/tools/triggerFullSyncTool',
@@ -18,6 +17,9 @@ const toolPaths = [
   './src/tools/createInvoiceTool',
   './src/tools/listInvoicesTool',
 ];
+
+// Import the getReportedTaskAggregatesTool directly
+const getReportedTaskAggregatesTool = require('./src/tools/getReportedTaskAggregatesTool');
 
 const SERVER_NAME = process.env.MCP_SERVER_NAME || 'ClickUpDataServer';
 const SERVER_VERSION = process.env.MCP_SERVER_VERSION || '0.1.0';
@@ -108,8 +110,63 @@ async function main() {
     let successCount = 0;
     let failCount = 0;
     
+    // Register dynamically loaded tools
     for (const tool of toolsToRegister) {
       console.error(`\n[MCP Server] Processing tool: ${tool.name}`);
+      console.error(`  Description: ${tool.description?.substring(0, 80)}...`);
+      
+      // Validate tool structure
+      if (!tool.name || !tool.description || !tool.inputSchema || !tool.handler) {
+        console.error(`  ✗ ERROR: Tool is missing required properties`);
+        console.error(`    Required: name, description, inputSchema, handler`);
+        console.error(`    Found: ${Object.keys(tool).join(', ')}`);
+        failCount++;
+        continue;
+      }
+      
+      // Validate input schema
+      console.error(`  Validating schema...`);
+      if (!validateJsonSchema(tool.inputSchema, tool.name)) {
+        console.error(`  ✗ ERROR: Invalid schema, skipping tool`);
+        failCount++;
+        continue;
+      }
+      
+      // Try to register the tool
+      try {
+        server.tool(
+          tool.name,
+          tool.description,
+          tool.inputSchema,
+          tool.handler
+        );
+        console.error(`  ✓ Tool registered successfully!`);
+        successCount++;
+      } catch (error) {
+        console.error(`  ✗ ERROR registering tool: ${error.message}`);
+        failCount++;
+      }
+    }
+    
+    // Register explicitly defined tools
+    const explicitlyDefinedTools = [
+      {
+        ...getReportedTaskAggregatesTool,
+        // Wrap the handler to properly extract arguments from the request params
+        handler: async (params) => {
+          // Extract the arguments from the params object
+          const args = params && typeof params === 'object' && params.arguments ? params.arguments : {};
+          // Log the received parameters for debugging
+          console.error(`[MCP Server] getReportedTaskAggregates called with params:`, JSON.stringify(params, null, 2));
+          console.error(`[MCP Server] Extracted args:`, JSON.stringify(args, null, 2));
+          // Call the original handler with the extracted arguments
+          return await getReportedTaskAggregatesTool.handler(args);
+        }
+      }
+    ];
+    
+    for (const tool of explicitlyDefinedTools) {
+      console.error(`\n[MCP Server] Processing explicitly defined tool: ${tool.name}`);
       console.error(`  Description: ${tool.description?.substring(0, 80)}...`);
       
       // Validate tool structure
