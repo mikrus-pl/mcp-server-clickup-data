@@ -24,6 +24,7 @@ const TOOL_MODULE_PATHS = [
   './src/tools/createInvoiceTool',
   './src/tools/listInvoicesTool',
   './src/tools/getReportedTaskAggregatesTool',
+  './src/tools/triggerGenerateAggregatesTool',
 ];
 
 // --- Utils ------------------------------------------------------------------

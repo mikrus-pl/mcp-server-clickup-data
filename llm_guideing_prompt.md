@@ -96,17 +96,16 @@ Poniżej znajduje się lista narzędzi MCP udostępnianych przez `ClickUpDataSer
     *   **Wynik:** Tekstowe potwierdzenie wykonania i podsumowanie (np. "CDC command 'sync-users' completed. Results: X new users, Y updated users.").
 
 2.  **`triggerTaskSync`**:
-    *   **Opis:** Uruchamia proces synchronizacji zadań dla określonej listy ClickUp w CDC. ID listy jest ładowane z zmiennej środowiskowej `CLICKUP_LIST_ID`.
+    *   **Opis:** Uruchamia proces synchronizacji zadań dla określonej listy ClickUp w CDC. ID listy jest ładowane z zmiennej środowiskowej `CLICKUP_LIST_ID`. **UWAGA:** Po wykonaniu synchronizacji zaleca się uruchomienie narzędzia `triggerGenerateAggregates` w celu przeliczenia statystyk, ponieważ same dane synchronizacji nie aktualizują automatycznie agregatów.
     *   **Argumenty:**
         *   `fullSync` (boolean, opcjonalne, domyślnie `false`): Czy przeprowadzić pełną synchronizację i nadpisać istniejące dane. Gdy false synchronizacja odbywa się w trybie update'u danych.
         *   `archived` (boolean, opcjonalne, domyślnie `false`): Czy dołączyć zadania zarchiwizowane.
     *   **Wynik:** Tekstowe potwierdzenie wykonania i podsumowanie (np. liczba pobranych/przetworzonych zadań, ewentualne warningi).
 
-3.  **`triggerAggregateGeneration`**:
-    *   **Opis:** Uruchamia proces generowania agregatów czasowych w CDC (tabela `ReportedTaskAggregates`). Zalecane po `triggerTaskSync`. 
-    *   **Argumenty (opcjonalne):**
-        *   `userId` (integer): ClickUp ID użytkownika.
-    *   **Wynik:** Tekstowe potwierdzenie wykonania i podsumowanie (np. liczba wygenerowanych agregatów, pominięte zadania).
+3.  **`triggerGenerateAggregates`**:
+    *   **Opis:** Uruchamia proces generowania agregatów czasowych w CDC (tabela `ReportedTaskAggregates`). Oblicza sumaryczny czas pracy dla każdego zadania "Parent" (uwzględniając czas spędzony na jego podzadaniach) w kontekście każdego przypisanego do niego użytkownika. Wyniki zapisuje do tabeli ReportedTaskAggregates. ID listy jest ładowane z zmiennej środowiskowej `CLICKUP_LIST_ID`.
+    *   **Argumenty:** Brak (generuje wszystkie agregaty dla listy).
+    *   **Wynik:** Tekstowe potwierdzenie wykonania i podsumowanie (np. liczba wygenerowanych agregatów).
 
 4.  **`triggerFullSync`**:
     *   **Opis:** Uruchamia pełny proces synchronizacji w CDC dla danej listy z ClickUp: synchronizuje użytkowników, następnie zadania (w trybie `--full-sync`), a na końcu generuje agregaty. ID listy jest ładowane z zmiennej środowiskowej `CLICKUP_LIST_ID`.
@@ -148,7 +147,7 @@ Poniżej znajduje się lista narzędzi MCP udostępnianych przez `ClickUpDataSer
 *   **Użytkownik pyta:** "Ile godzin Barbara Szpilka przepracowała dla klienta 'Aquano' w maju 2024?"
     *   **Ty (LLM):** Aby odpowiedzieć, najpierw zdobądź ID użytkownika "Barbara Szpilka" (np. używając `listUsers` i filtrując po nazwie). Następnie wywołaj `getReportedTaskAggregates` z filtrami: `userId: ID_Barbary`, `clientName: "Aquano"`, `month: "2024-05"`. Przetwórz zwrócony JSON i zsumuj czasy, aby sformułować odpowiedź.
 *   **Użytkownik prosi:** "Zaktualizuj dane z ClickUp, a potem przelicz agregaty."
-    *   **Ty (LLM):** Zaproponuj użytkownikowi sekwencję: 1. Wywołaj `triggerTaskSync` (możesz zapytać, czy ma być `--full-sync`). 2. Po pomyślnym zakończeniu, wywołaj `triggerAggregateGeneration`. Informuj użytkownika o postępie i wyniku każdego kroku.
+    *   **Ty (LLM):** Zaproponuj użytkownikowi sekwencję: 1. Wywołaj `triggerTaskSync` (możesz zapytać, czy ma być `--full-sync`). 2. Po pomyślnym zakończeniu, wywołaj `triggerGenerateAggregates`. Informuj użytkownika o postępie i wyniku każdego kroku.
 *   **Użytkownik pyta:** "Jaka jest aktualna stawka Kaji Wolak?"
     *   **Ty (LLM):** Wywołaj `listUsers`. Znajdź w wyniku "Kaja Wolak" i odczytaj jej `current_hourly_rate` oraz `rate_effective_from`.
 
