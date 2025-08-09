@@ -1,10 +1,12 @@
 // server.js — MCP server z registerTool() i konwersją JSON Schema → Zod
+// ✅ Poprawka: moduły narzędzi są ładowane względem __dirname (nie cwd)
 // Node 18+, CommonJS
 
 require('dotenv').config();
 const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
 const path = require('node:path');
+const fs = require('node:fs');
 const { z } = require('zod');
 
 // --- Server meta -------------------------------------------------------------
@@ -12,20 +14,25 @@ const SERVER_NAME = process.env.MCP_SERVER_NAME || 'ClickUpDataServer';
 const SERVER_VERSION = process.env.MCP_SERVER_VERSION || '0.1.0';
 
 // --- Moduły narzędzi --------------------------------------------------------
-const TOOL_MODULE_PATHS = [
-  './src/tools/listUsersTool',
-  './src/tools/triggerUserSyncTool',
-  './src/tools/triggerTaskSyncTool',
-  './src/tools/triggerFullSyncTool',
-  './src/tools/purgeDatabaseTool',
-  './src/tools/setUserHourlyRateTool',
-  './src/tools/listUserHourlyRatesTool',
-  './src/tools/deactivateUserHourlyRateTool',
-  './src/tools/createInvoiceTool',
-  './src/tools/listInvoicesTool',
-  './src/tools/getReportedTaskAggregatesTool',
-  './src/tools/triggerGenerateAggregatesTool',
+// Podajemy nazwy plików bez ścieżki; ścieżka jest składana względem __dirname
+const TOOL_MODULE_FILES = [
+  'listUsersTool',
+  'triggerUserSyncTool',
+  'triggerTaskSyncTool',
+  'triggerFullSyncTool',
+  'purgeDatabaseTool',
+  'setUserHourlyRateTool',
+  'listUserHourlyRatesTool',
+  'deactivateUserHourlyRateTool',
+  'createInvoiceTool',
+  'listInvoicesTool',
+  'getReportedTaskAggregatesTool',
+  'triggerGenerateAggregatesTool',
 ];
+
+const TOOL_MODULE_PATHS = TOOL_MODULE_FILES.map((name) =>
+  path.join(__dirname, 'src', 'tools', name)
+);
 
 // --- Utils ------------------------------------------------------------------
 const log = (...a) => console.error('[MCP Server]', ...a);
@@ -48,6 +55,20 @@ const isZodFieldMap = (obj) =>
 
 const isJsonSchemaObject = (schema) =>
   schema && typeof schema === 'object' && schema.type === 'object' && typeof schema.properties === 'object';
+
+function resolveToolPath(basePath) {
+  const candidates = [
+    basePath,
+    basePath + '.js',
+    basePath + '.cjs',
+    path.join(basePath, 'index.js'),
+    path.join(basePath, 'index.cjs'),
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+}
 
 // --- JSON Schema -> Zod -----------------------------------------------------
 // Konwertuje JSO (object) do mapy pól { name: zodType }
@@ -116,7 +137,6 @@ function jsonPropToZod(prop, required) {
 function normalizeInputSchema(inputSchema) {
   // 1) Już Zod type (z.object(...)) → przyjmij jako mapa pól (unwrap)
   if (isZodType(inputSchema)) {
-    // Użytkownicy czasem podają z.object({ ... }) — rozbij na mapę
     const shape = inputSchema._def && inputSchema._def.shape();
     if (shape && typeof shape === 'object') return shape;
     return {}; // nieobsługiwana forma
@@ -146,6 +166,8 @@ function validateToolModule(mod, modPath) {
 async function main() {
   log(`Initializing server: ${SERVER_NAME} v${SERVER_VERSION}`);
   log('=================================================');
+  log(`cwd = ${process.cwd()}`);
+  log(`__dirname = ${__dirname}`);
 
   const server = new McpServer({
     name: SERVER_NAME,
@@ -155,10 +177,15 @@ async function main() {
   log('Loading tool modules...');
   const registered = [];
 
-  for (const modPath of TOOL_MODULE_PATHS) {
+  for (const base of TOOL_MODULE_PATHS) {
     try {
-      const abs = path.resolve(modPath);
-      const toolMod = require(abs);
+      const modPath = resolveToolPath(base);
+      if (!modPath) {
+        log(`✗ File not found for tool module base: ${base}`);
+        continue;
+      }
+
+      const toolMod = require(modPath);
       validateToolModule(toolMod, modPath);
 
       const toolName = toolMod.name;
@@ -189,7 +216,7 @@ async function main() {
       registered.push(toolName);
       log('  ✓ Registered');
     } catch (e) {
-      log(`✗ ERROR loading/registering ${modPath}: ${e?.message || e}`);
+      log(`✗ ERROR loading/registering ${base}: ${e?.message || e}`);
     }
   }
 
