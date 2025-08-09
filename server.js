@@ -1,11 +1,18 @@
-// src/server.js
+// server.js — MCP server z registerTool() i konwersją JSON Schema → Zod
+// Node 18+, CommonJS
 
 require('dotenv').config();
 const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
+const path = require('node:path');
+const { z } = require('zod');
 
-// Tool paths to load
-const toolPaths = [
+// --- Server meta -------------------------------------------------------------
+const SERVER_NAME = process.env.MCP_SERVER_NAME || 'ClickUpDataServer';
+const SERVER_VERSION = process.env.MCP_SERVER_VERSION || '0.1.0';
+
+// --- Moduły narzędzi --------------------------------------------------------
+const TOOL_MODULE_PATHS = [
   './src/tools/listUsersTool',
   './src/tools/triggerUserSyncTool',
   './src/tools/triggerTaskSyncTool',
@@ -16,218 +23,192 @@ const toolPaths = [
   './src/tools/deactivateUserHourlyRateTool',
   './src/tools/createInvoiceTool',
   './src/tools/listInvoicesTool',
+  './src/tools/getReportedTaskAggregatesTool',
 ];
 
-// Import the getReportedTaskAggregatesTool directly
-const getReportedTaskAggregatesTool = require('./src/tools/getReportedTaskAggregatesTool');
+// --- Utils ------------------------------------------------------------------
+const log = (...a) => console.error('[MCP Server]', ...a);
 
-const SERVER_NAME = process.env.MCP_SERVER_NAME || 'ClickUpDataServer';
-const SERVER_VERSION = process.env.MCP_SERVER_VERSION || '0.1.0';
+const humanTitle = (name) =>
+  (name || '')
+    .replace(/[-_]+/g, ' ')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (m) => m.toUpperCase());
 
-// Helper function to validate JSON Schema
-function validateJsonSchema(schema, toolName) {
-  // Check if it's a Zod object (not allowed)
-  if (schema && schema._def) {
-    console.error(`  ✗ ERROR: Tool '${toolName}' uses Zod object instead of JSON Schema!`);
-    console.error(`    Zod objects are not supported by MCP SDK.`);
-    console.error(`    Please convert to JSON Schema format.`);
-    return false;
+const isZodType = (v) => !!(v && typeof v === 'object' && v._def);
+const isZodFieldMap = (obj) =>
+  obj &&
+  typeof obj === 'object' &&
+  !obj._def &&
+  Object.values(obj).length > 0 &&
+  Object.values(obj).every((v) => isZodType(v));
+
+const isJsonSchemaObject = (schema) =>
+  schema && typeof schema === 'object' && schema.type === 'object' && typeof schema.properties === 'object';
+
+// --- JSON Schema -> Zod -----------------------------------------------------
+// Konwertuje JSO (object) do mapy pól { name: zodType }
+function jsonSchemaToZodFieldMap(schema) {
+  if (!isJsonSchemaObject(schema)) return {};
+  const required = new Set(schema.required || []);
+  const out = {};
+  for (const [name, prop] of Object.entries(schema.properties || {})) {
+    out[name] = jsonPropToZod(prop, required.has(name));
   }
-  
-  // Check basic structure
-  if (!schema || typeof schema !== 'object') {
-    console.error(`  ✗ ERROR: Schema is not an object`);
-    return false;
-  }
-  
-  // Check for required 'type' property
-  if (!schema.type) {
-    console.error(`  ⚠ WARNING: Schema missing 'type' property`);
-  }
-  
-  // For object schemas, check properties
-  if (schema.type === 'object') {
-    if (!schema.properties) {
-      console.error(`  ⚠ WARNING: Object schema missing 'properties'`);
-    } else {
-      const propCount = Object.keys(schema.properties).length;
-      console.error(`  ✓ Schema has ${propCount} properties defined`);
-      
-      // List properties with their types
-      for (const [propName, propDef] of Object.entries(schema.properties)) {
-        const propType = propDef.type || 'unknown';
-        const isRequired = schema.required && schema.required.includes(propName);
-        const optionalText = isRequired ? 'required' : 'optional';
-        console.error(`    - ${propName}: ${propType} (${optionalText})`);
-        if (propDef.description) {
-          console.error(`      Description: ${propDef.description}`);
-        }
-        if (propDef.default !== undefined) {
-          console.error(`      Default: ${propDef.default}`);
-        }
-      }
-    }
-    
-    // Check for additionalProperties
-    if (schema.additionalProperties !== false) {
-      console.error(`  ⚠ WARNING: Consider setting additionalProperties: false`);
-    }
-  }
-  
-  return true;
+  return out;
 }
 
+function jsonPropToZod(prop, required) {
+  // Minimalna obsługa: string, integer, number, boolean, array, object, enum, default, description
+  let node;
+
+  if (!prop || typeof prop !== 'object') {
+    node = z.any();
+  } else if (prop.enum && Array.isArray(prop.enum) && prop.enum.length > 0) {
+    const vals = prop.enum;
+    if (vals.every((v) => typeof v === 'string')) node = z.enum(vals);
+    else node = z.union(vals.map((v) => z.literal(v)));
+  } else {
+    switch (prop.type) {
+      case 'string':
+        node = z.string();
+        break;
+      case 'integer':
+        node = z.number().int();
+        break;
+      case 'number':
+        node = z.number();
+        break;
+      case 'boolean':
+        node = z.boolean();
+        break;
+      case 'array': {
+        const itemProp = prop.items || {};
+        node = z.array(jsonPropToZod(itemProp, true));
+        break;
+      }
+      case 'object': {
+        const inner = isJsonSchemaObject(prop) ? jsonSchemaToZodFieldMap(prop) : {};
+        node = z.object(inner, { unknownKeys: prop.additionalProperties === false ? 'strict' : 'passthrough' });
+        break;
+      }
+      default:
+        node = z.any();
+    }
+  }
+
+  if (prop && typeof prop.description === 'string') {
+    node = node.describe(prop.description);
+  }
+  if (prop && Object.prototype.hasOwnProperty.call(prop, 'default')) {
+    // .default() czyni pole opcjonalnym z wartością domyślną
+    node = node.default(prop.default);
+    return node;
+  }
+  // Brak default → opcjonalność wg `required`
+  if (!required) node = node.optional();
+  return node;
+}
+
+function normalizeInputSchema(inputSchema) {
+  // 1) Już Zod type (z.object(...)) → przyjmij jako mapa pól (unwrap)
+  if (isZodType(inputSchema)) {
+    // Użytkownicy czasem podają z.object({ ... }) — rozbij na mapę
+    const shape = inputSchema._def && inputSchema._def.shape();
+    if (shape && typeof shape === 'object') return shape;
+    return {}; // nieobsługiwana forma
+  }
+  // 2) Mapa pól Zod
+  if (isZodFieldMap(inputSchema)) return inputSchema;
+
+  // 3) JSON Schema → konwersja
+  if (isJsonSchemaObject(inputSchema)) return jsonSchemaToZodFieldMap(inputSchema);
+
+  // 4) brak → puste
+  return {};
+}
+
+function validateToolModule(mod, modPath) {
+  if (!mod || typeof mod !== 'object') {
+    throw new Error(`Module export is not an object: ${modPath}`);
+  }
+  const missing = [];
+  if (!mod.name) missing.push('name');
+  if (!mod.description) missing.push('description');
+  if (!mod.handler) missing.push('handler');
+  if (missing.length) throw new Error(`Missing required exports [${missing.join(', ')}] in ${modPath}`);
+}
+
+// --- Main -------------------------------------------------------------------
 async function main() {
-  console.error(`[MCP Server] Initializing server: ${SERVER_NAME} v${SERVER_VERSION}`);
-  console.error(`[MCP Server] =================================================`);
-  
+  log(`Initializing server: ${SERVER_NAME} v${SERVER_VERSION}`);
+  log('=================================================');
+
   const server = new McpServer({
     name: SERVER_NAME,
     version: SERVER_VERSION,
-    capabilities: {
-      tools: { listChanged: false },
-    },
   });
 
-  try {
-    // Load tools with error handling
-    console.error('[MCP Server] Loading tools...');
-    const toolsToRegister = [];
-    
-    for (const toolPath of toolPaths) {
-      try {
-        const tool = require(toolPath);
-        toolsToRegister.push(tool);
-        console.error(`[MCP Server] ✓ Successfully loaded: ${tool.name || 'unknown'}`);
-      } catch (error) {
-        console.error(`[MCP Server] ✗ ERROR loading ${toolPath}:`, error.message);
-      }
-    }
-    
-    console.error(`[MCP Server] =================================================`);
-    console.error('[MCP Server] Registering tools with server...');
-    
-    let successCount = 0;
-    let failCount = 0;
-    
-    // Register dynamically loaded tools
-    for (const tool of toolsToRegister) {
-      console.error(`\n[MCP Server] Processing tool: ${tool.name}`);
-      console.error(`  Description: ${tool.description?.substring(0, 80)}...`);
-      
-      // Validate tool structure
-      if (!tool.name || !tool.description || !tool.inputSchema || !tool.handler) {
-        console.error(`  ✗ ERROR: Tool is missing required properties`);
-        console.error(`    Required: name, description, inputSchema, handler`);
-        console.error(`    Found: ${Object.keys(tool).join(', ')}`);
-        failCount++;
-        continue;
-      }
-      
-      // Validate input schema
-      console.error(`  Validating schema...`);
-      if (!validateJsonSchema(tool.inputSchema, tool.name)) {
-        console.error(`  ✗ ERROR: Invalid schema, skipping tool`);
-        failCount++;
-        continue;
-      }
-      
-      // Try to register the tool
-      try {
-        server.tool(
-          tool.name,
-          tool.description,
-          tool.inputSchema,
-          tool.handler
-        );
-        console.error(`  ✓ Tool registered successfully!`);
-        successCount++;
-      } catch (error) {
-        console.error(`  ✗ ERROR registering tool: ${error.message}`);
-        failCount++;
-      }
-    }
-    
-    // Register explicitly defined tools
-    const explicitlyDefinedTools = [
-      {
-        ...getReportedTaskAggregatesTool,
-        // Wrap the handler to properly extract arguments from the request params
-        handler: async (params) => {
-          // Extract the arguments from the params object
-          const args = params && typeof params === 'object' && params.arguments ? params.arguments : {};
-          // Log the received parameters for debugging
-          console.error(`[MCP Server] getReportedTaskAggregates called with params:`, JSON.stringify(params, null, 2));
-          console.error(`[MCP Server] Extracted args:`, JSON.stringify(args, null, 2));
-          // Call the original handler with the extracted arguments
-          return await getReportedTaskAggregatesTool.handler(args);
+  log('Loading tool modules...');
+  const registered = [];
+
+  for (const modPath of TOOL_MODULE_PATHS) {
+    try {
+      const abs = path.resolve(modPath);
+      const toolMod = require(abs);
+      validateToolModule(toolMod, modPath);
+
+      const toolName = toolMod.name;
+      const title = toolMod.title || humanTitle(toolName);
+      const description = toolMod.description;
+      const inputSchema = normalizeInputSchema(toolMod.inputSchema);
+
+      log(`\nRegistering tool: ${toolName}`);
+      log(`  Title: ${title}`);
+      log(`  Desc:  ${description?.slice(0, 120) || ''}${description && description.length > 120 ? '…' : ''}`);
+
+      server.registerTool(
+        toolName,
+        { title, description, inputSchema },
+        async (args, _ctx) => {
+          try {
+            return await toolMod.handler(args || {});
+          } catch (err) {
+            log(`✗ Handler error in ${toolName}:`, err?.stack || err?.message || err);
+            return {
+              isError: true,
+              content: [{ type: 'text', text: `Tool '${toolName}' failed: ${err?.message || String(err)}` }],
+            };
+          }
         }
-      }
-    ];
-    
-    for (const tool of explicitlyDefinedTools) {
-      console.error(`\n[MCP Server] Processing explicitly defined tool: ${tool.name}`);
-      console.error(`  Description: ${tool.description?.substring(0, 80)}...`);
-      
-      // Validate tool structure
-      if (!tool.name || !tool.description || !tool.inputSchema || !tool.handler) {
-        console.error(`  ✗ ERROR: Tool is missing required properties`);
-        console.error(`    Required: name, description, inputSchema, handler`);
-        console.error(`    Found: ${Object.keys(tool).join(', ')}`);
-        failCount++;
-        continue;
-      }
-      
-      // Validate input schema
-      console.error(`  Validating schema...`);
-      if (!validateJsonSchema(tool.inputSchema, tool.name)) {
-        console.error(`  ✗ ERROR: Invalid schema, skipping tool`);
-        failCount++;
-        continue;
-      }
-      
-      // Try to register the tool
-      try {
-        server.tool(
-          tool.name,
-          tool.description,
-          tool.inputSchema,
-          tool.handler
-        );
-        console.error(`  ✓ Tool registered successfully!`);
-        successCount++;
-      } catch (error) {
-        console.error(`  ✗ ERROR registering tool: ${error.message}`);
-        failCount++;
-      }
-    }
-    
-    console.error(`\n[MCP Server] =================================================`);
-    console.error(`[MCP Server] Registration complete:`);
-    console.error(`[MCP Server]   ✓ Successful: ${successCount} tools`);
-    console.error(`[MCP Server]   ✗ Failed: ${failCount} tools`);
-    console.error(`[MCP Server] =================================================`);
+      );
 
-    if (successCount === 0) {
-      throw new Error('No tools were successfully registered!');
+      registered.push(toolName);
+      log('  ✓ Registered');
+    } catch (e) {
+      log(`✗ ERROR loading/registering ${modPath}: ${e?.message || e}`);
     }
-
-  } catch (regError) {
-    console.error('[MCP Server] CRITICAL: Error during tool registration:', regError);
-    process.exit(1);
   }
-  
-  // Connect transport
+
+  if (registered.length === 0) throw new Error('No tools registered. Aborting.');
+
+  log('=================================================');
+  log(`Registration complete. Tools: ${registered.length}`);
+  registered.forEach((t) => log(`  • ${t}`));
+  log('=================================================');
+
   const transport = new StdioServerTransport();
-  console.error('\n[MCP Server] Connecting transport...');
+  log('Connecting stdio transport...');
   await server.connect(transport);
 
-  console.error(`[MCP Server] ${SERVER_NAME} v${SERVER_VERSION} is running`);
-  console.error('[MCP Server] Ready to handle MCP client requests');
-  console.error('[MCP Server] =================================================\n');
+  log(`${SERVER_NAME} v${SERVER_VERSION} is running`);
+  log('Ready to handle MCP client requests');
+  log('=================================================\n');
 }
 
-main().catch((error) => {
-  console.error('[MCP Server] Fatal error during server startup:', error);
+main().catch((err) => {
+  console.error('[MCP Server] Fatal startup error:', err?.stack || err?.message || err);
   process.exit(1);
 });

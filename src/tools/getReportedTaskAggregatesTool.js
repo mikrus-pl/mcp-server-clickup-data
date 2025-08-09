@@ -1,6 +1,7 @@
 const { db } = require('../db/database');
 const fs = require('fs');
 const path = require('path');
+//const { required } = require('zod/v4-mini');
 
 // Function to log to file
 function logToFile(message) {
@@ -38,8 +39,8 @@ const inputSchema = {
       default: 1000
     }
   },
+  required: [],
   additionalProperties: false
-  // Brak "required" array - wszystkie pola są opcjonalne
 };
 
 // Debug: Log the JSON Schema
